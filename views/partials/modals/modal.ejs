@@ -1,0 +1,19 @@
+<div class="modal <%= (typeof modalClass !== 'undefined' && modalClass) ? modalClass : '' %>" id="<%= id %>" aria-hidden="true" role="dialog" aria-modal="true" aria-label="<%= title %>">
+  <div class="modal__backdrop" data-modal-close></div>
+  <div class="modal__panel" role="document">
+    <header class="modal__header">
+      <div class="modal__title"><%= title %></div>
+      <button type="button" class="modal__close" data-modal-close aria-label="閉じる">✕</button>
+    </header>
+
+    <div class="modal__body">
+      <%- body %>
+    </div>
+
+    <% if (typeof footer !== 'undefined' && footer) { %>
+      <footer class="modal__footer">
+        <%- footer %>
+      </footer>
+    <% } %>
+  </div>
+</div>

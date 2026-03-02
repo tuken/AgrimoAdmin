@@ -1,0 +1,841 @@
+// 日報一覧ページ（report_list.ejs）
+// - 新UI: #reports-list / .reports-grid / data-*属性のカード
+// - 旧UI: GraphQLで取得して #report-list に描画（互換用）
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const pageRoot = document.querySelector('#reports-list');
+  const legacyRoot = document.querySelector('#report-list');
+
+  // 新UIが無い場合は、旧UIとして動かす
+  if (!pageRoot && legacyRoot) {
+    await initLegacy(legacyRoot);
+    return;
+  }
+
+  if (!pageRoot) return;
+
+  const calDaysRoot = document.querySelector('#calendar-days');
+  const grid = pageRoot.querySelector('.reports-grid');
+
+  const emptyMessage = pageRoot.querySelector('#empty-message');
+  const headerTitle = document.querySelector('#list-header-title');
+  const headerMeta = document.querySelector('#list-header-meta');
+
+  const searchInput = document.querySelector('#report-search');
+  const searchClear = document.querySelector('#report-search-clear');
+  const ownerFilter = document.querySelector('#owner-filter');
+  const fieldFilter = document.querySelector('#field-filter');
+  const taskFilter = document.querySelector('#task-filter');
+
+  const btnPrevMonth = document.querySelector('#prev-month');
+  const btnNextMonth = document.querySelector('#next-month');
+  const monthLabel = document.querySelector('#current-month-label');
+  const filterAllBtn = document.querySelector('#filter-all');
+  const ymPicker = document.querySelector('#year-month-picker');
+  const yearSelect = document.querySelector('#year-select');
+  const monthSelect = document.querySelector('#month-select');
+  const applyYm = document.querySelector('#apply-year-month');
+
+  const pagePrev = document.querySelector('#page-prev');
+  const pageNext = document.querySelector('#page-next');
+  const pageInfo = document.querySelector('#page-info');
+  const pagination = document.querySelector('#pagination');
+
+  // --------------------
+  // データソースの確保（DOMカード -> 無ければGraphQLで簡易カード生成）
+  // --------------------
+  let cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : [];
+  if (!cards.length && grid) {
+    const reports = await fetchReports(pageRoot);
+    grid.innerHTML = reports.map(toReportCardHtml).join('');
+    cards = Array.from(grid.querySelectorAll('[data-report]'));
+  }
+
+  // --------------------
+  // モーダル（登録 / 詳細 / 編集）
+  // --------------------
+  const btnNew = document.querySelector('#new-report-button');
+
+  const createModal = document.querySelector('#new-modal-backdrop');
+  const detailModal = document.querySelector('#detail-modal-backdrop');
+  const editModal = document.querySelector('#edit-modal-backdrop');
+
+  const createForm = document.querySelector('#report-create-form');
+  const editForm = document.querySelector('#report-edit-form');
+
+  const createMsg = document.querySelector('#new-message');
+  const editMsg = document.querySelector('#edit-message');
+
+  const detailMeta = document.querySelector('#detail-meta');
+  const detailTitle = document.querySelector('#detail-title');
+  const detailTags = document.querySelector('#detail-tags');
+  const detailTime = document.querySelector('#detail-time');
+  const detailMemo = document.querySelector('#detail-memo');
+  // NOTE: role_id により「編集」ボタン自体が描画されない場合がある
+  const detailEditBtn = document.querySelector('#detail-edit');
+
+  let selectedCard = null;
+
+  wireModal(createModal);
+  wireModal(detailModal);
+  wireModal(editModal);
+
+  // ESCで閉じる
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    [createModal, detailModal, editModal].forEach(function (m) {
+      if (m && m.classList.contains('open')) closeModal(m);
+    });
+  });
+
+  function setMessage(el, text, type) {
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'form-help ' + (type ? ('is-' + type) : '');
+  }
+
+  function currentSelectedDateOrToday(state) {
+    if (state && state.selectedDate) return state.selectedDate;
+    return formatDate(new Date());
+  }
+
+  // --------------------
+  // 状態
+  // --------------------
+  const now = new Date();
+  const state = {
+    viewYear: now.getFullYear(),
+    viewMonth: now.getMonth(), // 0-index
+    selectedDate: null, // 'YYYY-MM-DD'
+    search: '',
+    owner: '',
+    field: '',
+    task: '',
+    page: 1,
+    pageSize: 8,
+  };
+
+  // 年月ピッカー初期化（カードから範囲推定）
+  const years = extractYears(cards, state.viewYear);
+  if (yearSelect) {
+    yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}年</option>`).join('');
+    yearSelect.value = String(state.viewYear);
+  }
+  if (monthSelect) monthSelect.value = String(state.viewMonth);
+
+  // --------------------
+  // 再描画
+  // --------------------
+  function rerender({ resetPage = true } = {}) {
+    if (resetPage) state.page = 1;
+    renderCalendar(calDaysRoot, state, cards, () => rerender({ resetPage: true }));
+    applyFiltersAndPagination({
+      cards,
+      state,
+      emptyMessage,
+      headerTitle,
+      headerMeta,
+      pagination,
+      pagePrev,
+      pageNext,
+      pageInfo,
+    });
+    syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
+  }
+
+  // --------------------
+  // UIイベント
+  // --------------------
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      state.search = searchInput.value.trim();
+      rerender();
+    });
+  }
+  if (searchClear) {
+    searchClear.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      state.search = '';
+      rerender();
+    });
+  }
+  if (ownerFilter) {
+    ownerFilter.addEventListener('change', () => {
+      state.owner = ownerFilter.value;
+      rerender();
+    });
+  }
+  if (fieldFilter) {
+    fieldFilter.addEventListener('change', () => {
+      state.field = fieldFilter.value;
+      rerender();
+    });
+  }
+  if (taskFilter) {
+    taskFilter.addEventListener('change', () => {
+      state.task = taskFilter.value;
+      rerender();
+    });
+  }
+
+  if (btnPrevMonth) {
+    btnPrevMonth.addEventListener('click', () => {
+      const d = new Date(state.viewYear, state.viewMonth - 1, 1);
+      state.viewYear = d.getFullYear();
+      state.viewMonth = d.getMonth();
+      rerender({ resetPage: false });
+    });
+  }
+  if (btnNextMonth) {
+    btnNextMonth.addEventListener('click', () => {
+      const d = new Date(state.viewYear, state.viewMonth + 1, 1);
+      state.viewYear = d.getFullYear();
+      state.viewMonth = d.getMonth();
+      rerender({ resetPage: false });
+    });
+  }
+
+  // 年月ピッカー
+  if (monthLabel && ymPicker) {
+    monthLabel.addEventListener('click', () => {
+      ymPicker.hidden = !ymPicker.hidden;
+    });
+  }
+  if (applyYm) {
+    applyYm.addEventListener('click', () => {
+      const y = Number(yearSelect?.value ?? state.viewYear);
+      const m = Number(monthSelect?.value ?? state.viewMonth);
+      if (Number.isFinite(y) && Number.isFinite(m)) {
+        state.viewYear = y;
+        state.viewMonth = m;
+      }
+      if (ymPicker) ymPicker.hidden = true;
+      rerender({ resetPage: false });
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (!ymPicker || ymPicker.hidden) return;
+    const t = e.target;
+    if (ymPicker.contains(t) || monthLabel?.contains(t)) return;
+    ymPicker.hidden = true;
+  });
+
+  if (filterAllBtn) {
+    filterAllBtn.addEventListener('click', () => {
+      state.selectedDate = null;
+      rerender();
+    });
+  }
+
+  if (pagePrev) {
+    pagePrev.addEventListener('click', () => {
+      state.page = Math.max(1, state.page - 1);
+      rerender({ resetPage: false });
+    });
+  }
+  if (pageNext) {
+    pageNext.addEventListener('click', () => {
+      state.page += 1;
+      rerender({ resetPage: false });
+    });
+  }
+
+
+
+  // --------------------
+  // モーダル：イベント
+  // --------------------
+  if (btnNew && createModal && createForm) {
+    btnNew.addEventListener('click', function () {
+      createForm.reset();
+      setMessage(createMsg, '', '');
+      const d = currentSelectedDateOrToday(state);
+      const dateInput = createForm.querySelector('#new-date');
+      if (dateInput) dateInput.value = d;
+      openModal(createModal);
+    });
+  }
+
+  // カードクリックで詳細
+  if (grid && detailModal) {
+    grid.addEventListener('click', function (e) {
+      const card = e.target && e.target.closest ? e.target.closest('[data-report]') : null;
+      if (!card) return;
+      selectedCard = card;
+      const data = readCardData(card);
+      fillDetailModal(data);
+      openModal(detailModal);
+    });
+  }
+
+  // 詳細→編集
+  if (detailEditBtn && editModal && editForm) {
+    detailEditBtn.addEventListener('click', function () {
+      if (!selectedCard) return;
+      const data = readCardData(selectedCard);
+      fillEditForm(data);
+      closeModal(detailModal);
+      openModal(editModal);
+    });
+  }
+
+  // 新規登録
+  if (createForm) {
+    createForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      setMessage(createMsg, '', '');
+
+      const fd = new FormData(createForm);
+      const data = normalizeFormData(fd);
+
+      if (!data.date || !data.task || !data.owner || !data.field) {
+        setMessage(createMsg, '必須項目を入力してください', 'error');
+        return;
+      }
+
+      const el = buildReportCardElement(data);
+      if (grid) grid.prepend(el);
+
+      // cards配列更新
+      cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : cards;
+
+      // 選択日を登録日へ寄せる（UX）
+      state.selectedDate = data.date;
+      state.viewYear = parseInt(data.date.slice(0, 4), 10);
+      state.viewMonth = parseInt(data.date.slice(5, 7), 10) - 1;
+
+      closeModal(createModal);
+      rerender({ resetPage: true });
+    });
+  }
+
+  // 編集保存
+  if (editForm) {
+    editForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      setMessage(editMsg, '', '');
+
+      if (!selectedCard) {
+        setMessage(editMsg, '対象の日報が見つかりません', 'error');
+        return;
+      }
+
+      const fd = new FormData(editForm);
+      const data = normalizeFormData(fd);
+
+      if (!data.date || !data.task || !data.owner || !data.field) {
+        setMessage(editMsg, '必須項目を入力してください', 'error');
+        return;
+      }
+
+      applyCardUpdate(selectedCard, data);
+      cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : cards;
+
+      closeModal(editModal);
+      rerender({ resetPage: false });
+    });
+  }
+
+  // 初期描画
+  rerender({ resetPage: false });
+});
+
+// --------------------
+// 新UI: モーダル helpers
+// --------------------
+function qs(sel, root) { return (root || document).querySelector(sel); }
+function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+
+function openModal(backdrop) {
+  if (!backdrop) return;
+  backdrop.classList.add('open');
+  backdrop.setAttribute('aria-hidden', 'false');
+  document.documentElement.classList.add('modal-open');
+}
+
+function closeModal(backdrop) {
+  if (!backdrop) return;
+  backdrop.classList.remove('open');
+  backdrop.setAttribute('aria-hidden', 'true');
+  document.documentElement.classList.remove('modal-open');
+}
+
+function wireModal(backdrop) {
+  if (!backdrop) return;
+  qsa('[data-modal-close]', backdrop).forEach(function (el) {
+    el.addEventListener('click', function () { closeModal(backdrop); });
+  });
+  backdrop.addEventListener('click', function (e) {
+    if (e.target === backdrop) closeModal(backdrop);
+  });
+}
+
+function normalizeFormData(fd) {
+  const date = (fd.get('date') || '').toString().trim();
+  const task = (fd.get('task') || '').toString().trim();
+  const owner = (fd.get('owner') || '').toString().trim();
+  const field = (fd.get('field') || '').toString().trim();
+  const title = (fd.get('title') || '').toString().trim();
+  const timeStart = (fd.get('timeStart') || '').toString().trim();
+  const timeEnd = (fd.get('timeEnd') || '').toString().trim();
+  const memo = (fd.get('memo') || '').toString().trim();
+
+  const time = (timeStart || timeEnd) ? `${timeStart || '—'}〜${timeEnd || '—'}` : '';
+  const text = [task, title, field, owner, memo].filter(Boolean).join(' ');
+
+  return { date, task, owner, field, title, timeStart, timeEnd, time, memo, text };
+}
+
+function readCardData(card) {
+  const ds = card ? card.dataset : {};
+  const date = ds.date || '';
+  const task = ds.task || '';
+  const owner = ds.owner || '';
+  const field = ds.field || '';
+  const title = ds.title || qs('.report-title', card)?.textContent?.trim() || '';
+  const memo = ds.memo || '';
+  const time = ds.time || qs('.badge-time', card)?.textContent?.replace('🕒', '')?.trim() || '';
+  const text = ds.text || [task, title, field, owner, memo].filter(Boolean).join(' ');
+  const id = ds.reportId || ds.id || '';
+  return { id, date, task, owner, field, title, memo, time, text };
+}
+
+function fillDetailModal(data) {
+  const meta = toJaMetaLine(data.date, data.field, data.owner);
+  const tagsHtml = [
+    data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '',
+  ].filter(Boolean).join('');
+
+  const detailMeta = qs('#detail-meta');
+  const detailTitle = qs('#detail-title');
+  const detailTags = qs('#detail-tags');
+  const detailTime = qs('#detail-time');
+  const detailMemo = qs('#detail-memo');
+
+  if (detailMeta) detailMeta.textContent = meta;
+  if (detailTitle) detailTitle.textContent = data.title || '（タイトル未設定）';
+  if (detailTags) detailTags.innerHTML = tagsHtml || '<span class="report-tag">—</span>';
+  if (detailTime) detailTime.textContent = data.time || '—';
+  if (detailMemo) detailMemo.textContent = data.memo || '—';
+}
+
+function fillEditForm(data) {
+  const editForm = qs('#report-edit-form');
+  if (!editForm) return;
+
+  qs('#edit-date', editForm).value = data.date || '';
+  qs('#edit-task', editForm).value = data.task || '';
+  qs('#edit-owner', editForm).value = data.owner || '';
+  qs('#edit-field', editForm).value = data.field || '';
+  qs('#edit-title', editForm).value = data.title || '';
+  qs('#edit-memo', editForm).value = data.memo || '';
+
+  // time split (09:00〜11:00)
+  const m = (data.time || '').match(/(\d{2}:\d{2})\s*〜\s*(\d{2}:\d{2})/);
+  qs('#edit-time-start', editForm).value = m ? m[1] : '';
+  qs('#edit-time-end', editForm).value = m ? m[2] : '';
+
+  const hidden = qs('#edit-target-id', editForm);
+  if (hidden) hidden.value = data.id || '';
+}
+
+function buildReportCardElement(data) {
+  const el = document.createElement('article');
+  el.className = 'report-card';
+  el.setAttribute('data-report', '');
+  el.dataset.date = data.date;
+  el.dataset.task = data.task;
+  el.dataset.owner = data.owner;
+  el.dataset.field = data.field;
+  el.dataset.title = data.title || '';
+  el.dataset.memo = data.memo || '';
+  el.dataset.time = data.time || '';
+  el.dataset.text = data.text || '';
+
+  const meta = toJaMetaLine(data.date, data.field, data.owner);
+  const title = data.title || defaultTitleForTask(data.task, data.field);
+  const tag = data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '';
+  const timeBadge = data.time ? `🕒 ${escapeHtml(data.time)}` : '🕒 —';
+
+  el.innerHTML = `
+    <div class="report-thumb">
+      <img src="https://images.pexels.com/photos/2255801/pexels-photo-2255801.jpeg?auto=compress&cs=tinysrgb&w=800" alt="${escapeHtml(data.task || '作業')}の様子">
+    </div>
+    <div class="report-content">
+      <div class="report-meta">${escapeHtml(meta)}</div>
+      <div class="report-title">${escapeHtml(title)}</div>
+      <div class="report-tags">${tag || '<span class="report-tag">—</span>'}</div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">⛅ —</span>
+          <span class="badge-worker">👨‍🌾 —</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">${timeBadge}</span>
+          <span class="badge-updated">最終更新：${formatUpdatedNow()}</span>
+        </div>
+      </div>
+    </div>
+  `;
+  return el;
+}
+
+function applyCardUpdate(card, data) {
+  if (!card) return;
+  card.dataset.date = data.date;
+  card.dataset.task = data.task;
+  card.dataset.owner = data.owner;
+  card.dataset.field = data.field;
+  card.dataset.title = data.title || '';
+  card.dataset.memo = data.memo || '';
+  card.dataset.time = data.time || '';
+  card.dataset.text = data.text || '';
+
+  const meta = toJaMetaLine(data.date, data.field, data.owner);
+  const title = data.title || defaultTitleForTask(data.task, data.field);
+  const metaEl = qs('.report-meta', card);
+  const titleEl = qs('.report-title', card);
+  const tagsEl = qs('.report-tags', card);
+  const timeEl = qs('.badge-time', card);
+  const updEl = qs('.badge-updated', card);
+
+  if (metaEl) metaEl.textContent = meta;
+  if (titleEl) titleEl.textContent = title;
+  if (tagsEl) tagsEl.innerHTML = data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '<span class="report-tag">—</span>';
+  if (timeEl) timeEl.textContent = data.time ? `🕒 ${data.time}` : '🕒 —';
+  if (updEl) updEl.textContent = `最終更新：${formatUpdatedNow()}`;
+}
+
+function toJaMetaLine(dateKey, field, owner) {
+  // dateKey: YYYY-MM-DD
+  if (!dateKey) return `${field || '—'}／${owner || '—'}`;
+  const parts = dateKey.split('-').map(n => parseInt(n, 10));
+  if (parts.length !== 3 || parts.some(isNaN)) return `${dateKey}・${field || '—'}／${owner || '—'}`;
+  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+  const w = ['日','月','火','水','木','金','土'][d.getDay()];
+  const ymd = `${parts[0]}/${String(parts[1]).padStart(2,'0')}/${String(parts[2]).padStart(2,'0')}（${w}）`;
+  return `${ymd}・${field || '—'}／${owner || '—'}`;
+}
+
+function defaultTitleForTask(task, field) {
+  if (!task) return '作業日報';
+  const f = field ? `（${field}）` : '';
+  if (task === '灌水') return `灌水作業${f}`;
+  if (task === '施肥') return `施肥作業${f}`;
+  if (task === '収穫') return `収穫作業${f}`;
+  if (task === '除草') return `除草作業${f}`;
+  if (task.indexOf('防除') === 0) return `防除作業${f}`;
+  return `${task}作業${f}`;
+}
+
+function formatUpdatedNow() {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${mm}/${dd} ${hh}:${mi}`;
+}
+
+
+
+async function initLegacy(listRoot) {
+  const calRoot = document.querySelector('#calendar-days');
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  const reports = await fetchReports(listRoot);
+  renderLegacyCalendar(calRoot, year, month, reports);
+  renderLegacyReportList(listRoot, reports);
+}
+
+async function fetchReports(listRoot) {
+  const q = `
+    query Reports {
+      reports {
+        id
+        reportDate
+        field { fieldName name }
+        user { firstName lastName email }
+        reportType
+      }
+    }
+  `;
+
+  const result = await window.gql(q);
+  if (result.errors) {
+    listRoot.innerHTML = `<div class="report-item"><div class="report-item-title">取得に失敗</div><div class="report-item-meta">${escapeHtml(result.errors[0].message)}</div></div>`;
+    return [];
+  }
+  return result.data?.reports || [];
+}
+
+// --------------------
+// 新UI: カレンダー
+// --------------------
+function renderCalendar(root, state, cards, onSelectDate) {
+  if (!root) return;
+
+  const year = state.viewYear;
+  const month = state.viewMonth;
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const startDow = first.getDay();
+
+  const todayKey = formatDate(new Date());
+  const countByDate = countCardsByDate(cards);
+
+  const cells = [];
+  for (let i = 0; i < startDow; i++) {
+    cells.push('<div class="calendar-day" style="background: rgba(243,244,246,0.7); cursor: default;" aria-hidden="true"></div>');
+  }
+
+  for (let d = 1; d <= last.getDate(); d++) {
+    const key = formatDate(year, month, d);
+    const n = countByDate.get(key) || 0;
+    const isSelected = state.selectedDate === key;
+    const isToday = key === todayKey;
+
+    cells.push(`
+      <div
+        class="calendar-day${n ? ' has-reports' : ''}${isSelected ? ' selected' : ''}${isToday ? ' today' : ''}"
+        data-cal-date="${key}"
+        role="button"
+        tabindex="0"
+        aria-label="${key}"
+      >
+        <div class="calendar-day-header">
+          <span class="calendar-day-number">${d}</span>
+          ${n ? `<span class="calendar-day-badge">${n}件</span>` : ''}
+        </div>
+      </div>
+    `);
+  }
+
+  root.innerHTML = cells.join('');
+
+  root.querySelectorAll('[data-cal-date]').forEach(cell => {
+    const activate = () => {
+      state.selectedDate = cell.getAttribute('data-cal-date');
+      onSelectDate?.();
+    };
+    cell.addEventListener('click', activate);
+    cell.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        activate();
+      }
+    });
+  });
+}
+
+// --------------------
+// 新UI: フィルタ & ページング
+// --------------------
+function applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo }) {
+  const filtered = cards.filter(c => {
+    const d = (c.dataset.date || '').trim();
+    const task = (c.dataset.task || '').trim();
+    const owner = (c.dataset.owner || '').trim();
+    const field = (c.dataset.field || '').trim();
+    const text = (c.dataset.text || '').toLowerCase();
+
+    if (state.selectedDate && d !== state.selectedDate) return false;
+    if (state.task && task !== state.task) return false;
+    if (state.owner && owner !== state.owner) return false;
+    if (state.field && field !== state.field) return false;
+    if (state.search) {
+      const q = state.search.toLowerCase();
+      if (!text.includes(q)) return false;
+    }
+    return true;
+  });
+
+  filtered.sort((a, b) => String(b.dataset.date || '').localeCompare(String(a.dataset.date || '')));
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+  state.page = Math.min(state.page, totalPages);
+
+  const start = (state.page - 1) * state.pageSize;
+  const end = start + state.pageSize;
+  const pageItems = new Set(filtered.slice(start, end));
+
+  for (const c of cards) c.style.display = pageItems.has(c) ? '' : 'none';
+
+  if (emptyMessage) emptyMessage.style.display = total ? 'none' : '';
+  if (pageInfo) pageInfo.textContent = `${state.page} / ${totalPages}`;
+  if (pagePrev) pagePrev.disabled = state.page <= 1;
+  if (pageNext) pageNext.disabled = state.page >= totalPages;
+  if (pagination) pagination.style.display = totalPages > 1 ? '' : 'none';
+
+  if (headerTitle) {
+    headerTitle.textContent = state.selectedDate ? `日報一覧（${formatDateJa(state.selectedDate)}）` : '日報一覧（すべて）';
+  }
+  if (headerMeta) {
+    const parts = [];
+    if (state.owner) parts.push(`オーナー：${state.owner}`);
+    if (state.field) parts.push(`圃場：${state.field}`);
+    if (state.task) parts.push(`作業：${state.task}`);
+    if (state.search) parts.push(`検索：「${state.search}」`);
+    headerMeta.textContent = parts.length ? `${parts.join(' / ')}（${total}件）` : `今日を含む最近の作業が新しい順に表示されます。（${total}件）`;
+  }
+}
+
+function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn }) {
+  if (searchInput && searchInput.value !== state.search) searchInput.value = state.search;
+  if (ownerFilter && ownerFilter.value !== state.owner) ownerFilter.value = state.owner;
+  if (fieldFilter && fieldFilter.value !== state.field) fieldFilter.value = state.field;
+  if (taskFilter && taskFilter.value !== state.task) taskFilter.value = state.task;
+
+  if (monthLabel) monthLabel.textContent = `${state.viewYear}年 ${state.viewMonth + 1}月`;
+  if (yearSelect) yearSelect.value = String(state.viewYear);
+  if (monthSelect) monthSelect.value = String(state.viewMonth);
+
+  if (filterAllBtn) {
+    if (state.selectedDate) filterAllBtn.classList.remove('active');
+    else filterAllBtn.classList.add('active');
+  }
+}
+
+// --------------------
+// GraphQL -> 新UIの簡易カード
+// --------------------
+function toReportCardHtml(r) {
+  const date = escapeHtml(r.reportDate ?? r.date ?? '');
+  const task = escapeHtml(r.reportType ?? r.workType ?? '日報');
+  const fieldName = escapeHtml(r.field?.fieldName ?? r.field?.name ?? '');
+  const userName = (r.user?.firstName || r.user?.lastName)
+    ? `${r.user?.firstName ?? ''} ${r.user?.lastName ?? ''}`.trim()
+    : (r.user?.email ?? '');
+  const ownerName = escapeHtml(userName);
+  const text = escapeHtml([task, fieldName, ownerName].filter(Boolean).join(' '));
+
+  return `
+    <article class="report-card" data-report data-date="${date}" data-task="${task}" data-owner="${ownerName}" data-field="${fieldName}" data-text="${text}">
+      <div class="report-content">
+        <div class="report-meta">${date}${fieldName ? `・${fieldName}` : ''}${ownerName ? `／${ownerName}` : ''}</div>
+        <div class="report-title">${task}</div>
+        <div class="report-tags"><span class="report-tag">${task}</span></div>
+      </div>
+    </article>
+  `;
+}
+
+// --------------------
+// 旧UI（互換）
+// --------------------
+function renderLegacyReportList(root, reports) {
+  if (!reports.length) {
+    root.innerHTML = `<div class="report-item"><div class="report-item-title">日報がありません</div><div class="report-item-meta">データがまだ登録されていない可能性があります。</div></div>`;
+    return;
+  }
+
+  const sorted = [...reports].sort((a, b) => String(b.reportDate ?? '').localeCompare(String(a.reportDate ?? '')));
+
+  root.innerHTML = sorted.map(r => {
+    const fieldName = r.field?.fieldName ?? r.field?.name ?? '';
+    const userName = (r.user?.firstName || r.user?.lastName)
+      ? `${r.user.firstName ?? ''} ${r.user.lastName ?? ''}`.trim()
+      : (r.user?.email ?? '');
+
+    return `
+      <article class="report-item">
+        <div class="report-item-title">${escapeHtml(r.reportType ?? r.workType ?? '日報')}</div>
+        <div class="report-item-meta">日付：${escapeHtml(r.reportDate ?? r.date ?? '')}</div>
+        <div class="report-item-meta">圃場：${escapeHtml(fieldName)}</div>
+        <div class="report-item-meta">担当：${escapeHtml(userName)}</div>
+      </article>
+    `;
+  }).join('');
+}
+
+function renderLegacyCalendar(root, year, month, reports) {
+  if (!root) return;
+
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const startDow = first.getDay();
+
+  const countByDate = new Map();
+  for (const r of reports) {
+    const key = String(r.reportDate ?? r.date ?? '');
+    if (!key) continue;
+    countByDate.set(key, (countByDate.get(key) || 0) + 1);
+  }
+
+  const cells = [];
+  for (let i = 0; i < startDow; i++) {
+    cells.push('<div class="calendar-day" style="background: rgba(243,244,246,0.7);"></div>');
+  }
+  for (let d = 1; d <= last.getDate(); d++) {
+    const key = formatDate(year, month, d);
+    const n = countByDate.get(key) || 0;
+    cells.push(`
+      <div class="calendar-day">
+        <div>${d}</div>
+        ${n ? `<div style="margin-top:6px; font-size:0.68rem; color:#2563eb;">${n}件</div>` : ''}
+      </div>
+    `);
+  }
+  root.innerHTML = cells.join('');
+}
+
+// --------------------
+// Utils
+// --------------------
+function extractYears(cards, fallbackYear) {
+  const years = new Set();
+  for (const c of cards) {
+    const d = String(c.dataset.date || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+    years.add(Number(d.slice(0, 4)));
+  }
+  if (!years.size) years.add(fallbackYear);
+  const list = Array.from(years).sort((a, b) => a - b);
+  const min = Math.min(...list);
+  const max = Math.max(...list);
+  const padded = [];
+  for (let y = min - 1; y <= max + 1; y++) padded.push(y);
+  return padded;
+}
+
+function countCardsByDate(cards) {
+  const m = new Map();
+  for (const c of cards) {
+    const key = String(c.dataset.date || '').trim();
+    if (!key) continue;
+    m.set(key, (m.get(key) || 0) + 1);
+  }
+  return m;
+}
+
+function formatDate(dateOrY, m, d) {
+  // overload:
+  // - formatDate(Date)
+  // - formatDate(year, month0Index, day)
+  if (dateOrY instanceof Date) {
+    const y = dateOrY.getFullYear();
+    const mm = String(dateOrY.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateOrY.getDate()).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
+  }
+  const y = Number(dateOrY);
+  const mm = String(Number(m) + 1).padStart(2, '0');
+  const dd = String(Number(d)).padStart(2, '0');
+  return `${y}-${mm}-${dd}`;
+}
+
+function formatDateJa(iso) {
+  return String(iso || '').replaceAll('-', '/');
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}

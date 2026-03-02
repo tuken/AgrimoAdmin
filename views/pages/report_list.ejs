@@ -1,0 +1,750 @@
+<%- include('../partials/head', { title: "日報一覧", pageCss: "report", bodyClass: "" }) %>
+<%- include('../partials/header') %>
+
+<% const isRole1 = (user && Number(user.role_id) === 1); %>
+
+<main>
+  <div class="container">
+<section class="card">
+      <header class="page-header">
+        <div class="page-title-group">
+          <div class="page-title-eyebrow">Daily Reports</div>
+          <h1 class="page-title">日報管理</h1>
+          <div class="page-title-sub">カレンダーと連動した日報の一覧・検索・編集</div>
+        </div>
+        <div class="page-header-actions">
+          <% if (!isRole1) { %>
+            <button class="primary-button" type="button" id="new-report-button">
+              <span class="icon">＋</span>
+              <span>日報を登録</span>
+            </button>
+          <% } %>
+        </div>
+      </header>
+
+      <div class="layout">
+        <!-- カレンダー -->
+        <section class="calendar-card">
+          <!-- <header class="calendar-header">
+            <div class="calendar-title-group">
+              <div class="calendar-title-main">
+                <span>作業カレンダー</span>
+                <span class="badge-inline">
+                  <span>📅</span><span>クリックで日別絞り込み</span>
+                </span>
+              </div>
+              <div class="calendar-sub">日報と連動したカレンダーです。日付をクリックすると、その日の作業だけを一覧で確認できます。</div>
+            </div>
+            <div class="calendar-nav">
+              <button class="calendar-arrow" id="prev-month" type="button">◀</button>
+              <div class="calendar-month-label" id="current-month-label">2025年 12月</div>
+              <button class="calendar-arrow" id="next-month" type="button">▶</button>
+            </div>
+          </header> -->
+<header class="panel-header">
+  <div class="panel-header-main">
+    <div class="panel-title"><span>📅</span>作業カレンダー</div>
+    <div class="calendar-sub">
+      日報と連動したカレンダーです。日付をクリックすると、その日の作業だけを一覧で確認できます。
+    </div>
+  </div>
+
+  <div class="calendar-nav">
+    <button class="calendar-arrow" id="prev-month" type="button">◀</button>
+
+    <div class="calendar-month-label" id="current-month-label">
+      2025年 12月
+    </div>
+
+    <button class="calendar-arrow" id="next-month" type="button">▶</button>
+
+    <!-- ▼ 年月プルダウン（クリックで開く小パネル） -->
+    <div class="year-month-picker" id="year-month-picker" hidden>
+      <select id="year-select"></select>
+      <select id="month-select">
+        <option value="0">1月</option>
+        <option value="1">2月</option>
+        <option value="2">3月</option>
+        <option value="3">4月</option>
+        <option value="4">5月</option>
+        <option value="5">6月</option>
+        <option value="6">7月</option>
+        <option value="7">8月</option>
+        <option value="8">9月</option>
+        <option value="9">10月</option>
+        <option value="10">11月</option>
+        <option value="11">12月</option>
+      </select>
+      <button type="button" id="apply-year-month">適用</button>
+    </div>
+  </div>
+</header>
+
+          <div class="calendar-grid" id="calendar-grid">
+            <div class="calendar-weekdays">
+              <div class="calendar-weekday sun">日</div>
+              <div class="calendar-weekday">月</div>
+              <div class="calendar-weekday">火</div>
+              <div class="calendar-weekday">水</div>
+              <div class="calendar-weekday">木</div>
+              <div class="calendar-weekday">金</div>
+              <div class="calendar-weekday sat">土</div>
+            </div>
+            <div class="calendar-days" id="calendar-days">
+              <!-- JavaScriptで生成 -->
+            </div>
+          </div>
+
+          <footer class="calendar-footer">
+            <button class="calendar-filter active" id="filter-all" type="button">
+              <span>すべての日報を表示</span>
+            </button>
+            <div class="calendar-legend">
+              <span class="legend-dot"></span>
+              <span>日報のある日</span>
+            </div>
+          </footer>
+        </section>
+
+        <!-- 日報一覧 -->
+        <section class="reports-card">
+          <header class="reports-header">
+            <div class="reports-header-left">
+              <div class="reports-title" id="list-header-title">日報一覧（すべて）</div>
+              <div class="reports-meta" id="list-header-meta">
+                今日を含む最近の作業が新しい順に表示されます。
+              </div>
+            </div>
+            <div class="reports-header-right">
+              <div class="search-row">
+                <div class="search-field">
+                  <span class="search-icon">🔍</span>
+                  <input
+                    id="report-search"
+                    class="search-input"
+                    type="text"
+                    placeholder="作業内容・メモなどで検索"
+                  >
+                  <button class="search-clear" id="report-search-clear" type="button">×</button>
+                </div>
+              </div>
+              <div class="filter-row">
+                <span class="filter-label">絞り込み：</span>
+                <% if (isRole1) { %>
+                  <div class="task-select-wrapper">
+                    <select id="owner-filter">
+                      <option value="">すべてのオーナー</option>
+                      <option value="高橋アグリサービス">高橋アグリサービス</option>
+                      <option value="佐藤農園">佐藤農園</option>
+                    </select>
+                  </div>
+                <% } %>
+                <div class="task-select-wrapper">
+                  <select id="field-filter">
+                    <option value="">すべての圃場</option>
+                    <option value="1号圃場">1号圃場</option>
+                    <option value="2号圃場">2号圃場</option>
+                    <option value="3号圃場">3号圃場</option>
+                    <option value="全圃場">全圃場</option>
+                  </select>
+                </div>
+                <div class="task-select-wrapper">
+                  <select id="task-filter">
+                    <option value="">すべての作業</option>
+                    <option value="耕起">耕起</option>
+                    <option value="耕耘・代かき">耕耘・代かき</option>
+                    <option value="播種">播種</option>
+                    <option value="定植">定植</option>
+                    <option value="施肥">施肥</option>
+                    <option value="灌水">灌水</option>
+                    <option value="除草">除草</option>
+                    <option value="防除（農薬散布）">防除（農薬散布）</option>
+                    <option value="収穫">収穫</option>
+                    <option value="点検・巡回">点検・巡回</option>
+                    <option value="メンテナンス">メンテナンス</option>
+                    <option value="その他">その他</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div class="reports-list" id="reports-list">
+            <div class="empty-message" id="empty-message" style="display:none;">
+              条件に一致する日報がありません。絞り込み条件を見直してください。
+            </div>
+<div class="reports-grid">
+  <!-- ダミー日報カード -->
+  <article
+    class="report-card"
+    data-report
+    data-date="2025-12-10"
+    data-task="施肥"
+    data-owner="高橋アグリサービス"
+    data-field="1号圃場"
+    data-text="施肥 ほうれん草 1号圃場 有機肥料 追肥 メモ：葉色を見て調整"
+  >
+    <div class="report-thumb">
+      <img src="https://images.pexels.com/photos/5184159/pexels-photo-5184159.jpeg?auto=compress&cs=tinysrgb&w=800" alt="施肥の様子">
+    </div>
+    <div class="report-content">
+      <div class="report-meta">2025/12/10（水）・1号圃場／高橋アグリサービス</div>
+      <div class="report-title">ほうれん草の追肥作業</div>
+      <div class="report-tags">
+        <span class="report-tag">施肥</span>
+        <span class="report-tag">有機質肥料</span>
+      </div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">⛅ 晴れ・10〜18℃</span>
+          <span class="badge-worker">👨‍🌾 佐藤／田中</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">🕒 09:00〜11:00</span>
+          <span class="badge-updated">最終更新：12/10 18:24</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article
+    class="report-card"
+    data-report
+    data-date="2025-12-10"
+    data-task="灌水"
+    data-owner="高橋アグリサービス"
+    data-field="ハウス全圃場"
+    data-text="ハウス全体 灌水 トマト きゅうり メモ：潅水量をやや減らす"
+  >
+    <div class="report-thumb">
+      <img src="https://images.pexels.com/photos/1268101/pexels-photo-1268101.jpeg?auto=compress&cs=tinysrgb&w=800" alt="灌水の様子">
+    </div>
+    <div class="report-content">
+      <div class="report-meta">2025/12/10（水）・ハウス全圃場／高橋アグリサービス</div>
+      <div class="report-title">ハウス全体の灌水調整</div>
+      <div class="report-tags">
+        <span class="report-tag">灌水</span>
+        <span class="report-tag">ハウス管理</span>
+      </div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">☀ 晴れ・朝方霜注意</span>
+          <span class="badge-worker">👩‍🌾 鈴木</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">🕒 05:30〜07:00</span>
+          <span class="badge-updated">最終更新：12/10 07:05</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article
+    class="report-card"
+    data-report
+    data-date="2025-12-11"
+    data-task="防除（農薬散布）"
+    data-owner="佐藤農園"
+    data-field="2号圃場"
+    data-text="キャベツ 畑 防除 農薬散布 メモ：アオムシ防除 一部薬剤控えめ"
+  >
+    <div class="report-thumb">
+      <img src="https://images.pexels.com/photos/1268102/pexels-photo-1268102.jpeg?auto=compress&cs=tinysrgb&w=800" alt="防除の様子">
+    </div>
+    <div class="report-content">
+      <div class="report-meta">2025/12/11（木）・2号圃場／佐藤農園</div>
+      <div class="report-title">キャベツ圃場の防除作業</div>
+      <div class="report-tags">
+        <span class="report-tag">防除（農薬散布）</span>
+        <span class="report-tag">病害虫対策</span>
+      </div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">☁ くもり・微風</span>
+          <span class="badge-worker">👨‍🌾 佐藤</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">🕒 08:30〜10:00</span>
+          <span class="badge-updated">最終更新：12/11 10:15</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article
+    class="report-card"
+    data-report
+    data-date="2025-12-12"
+    data-task="播種"
+    data-owner="佐藤農園"
+    data-field="3号圃場"
+    data-text="にんじん 播種 条播き メモ：発芽を揃えるため潅水計画を見直し"
+  >
+    <div class="report-thumb">
+      <img src="https://images.pexels.com/photos/175389/pexels-photo-175389.jpeg?auto=compress&cs=tinysrgb&w=800" alt="播種の様子">
+    </div>
+    <div class="report-content">
+      <div class="report-meta">2025/12/12（金）・3号圃場／佐藤農園</div>
+      <div class="report-title">にんじんの播種作業</div>
+      <div class="report-tags">
+        <span class="report-tag">播種</span>
+        <span class="report-tag">にんじん</span>
+      </div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">🌤 晴れ時々くもり</span>
+          <span class="badge-worker">👨‍🌾 佐藤</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">🕒 09:00〜12:00</span>
+          <span class="badge-updated">最終更新：12/12 13:00</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article
+    class="report-card"
+    data-report
+    data-date="2025-12-13"
+    data-task="除草"
+    data-owner="高橋アグリサービス"
+    data-field="1号圃場"
+    data-text="除草 作業 手取り除草 メモ：畝間の草が多く時間超過"
+  >
+    <div class="report-thumb">
+      <img src="https://images.pexels.com/photos/1301856/pexels-photo-1301856.jpeg?auto=compress&cs=tinysrgb&w=800" alt="除草の様子">
+    </div>
+    <div class="report-content">
+      <div class="report-meta">2025/12/13（土）・1号圃場／高橋アグリサービス</div>
+      <div class="report-title">1号圃場の畝間除草</div>
+      <div class="report-tags">
+        <span class="report-tag">除草</span>
+        <span class="report-tag">手取り除草</span>
+      </div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">☀ 晴れ・やや強風</span>
+          <span class="badge-worker">👩‍🌾 田中</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">🕒 13:00〜16:00</span>
+          <span class="badge-updated">最終更新：12/13 16:30</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article
+    class="report-card"
+    data-report
+    data-date="2025-12-14"
+    data-task="点検・巡回"
+    data-owner="高橋アグリサービス"
+    data-field="全圃場"
+    data-text="点検 巡回 全圃場 メモ：病害虫・水管理の確認"
+  >
+    <div class="report-thumb">
+      <img src="https://images.pexels.com/photos/113723/pexels-photo-113723.jpeg?auto=compress&cs=tinysrgb&w=800" alt="点検・巡回の様子">
+    </div>
+    <div class="report-content">
+      <div class="report-meta">2025/12/14（日）・全圃場／高橋アグリサービス</div>
+      <div class="report-title">全圃場巡回・点検</div>
+      <div class="report-tags">
+        <span class="report-tag">点検・巡回</span>
+        <span class="report-tag">巡回記録</span>
+      </div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">⛅ くもり・午後から晴れ</span>
+          <span class="badge-worker">👨‍🌾 佐藤</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">🕒 08:00〜11:00</span>
+          <span class="badge-updated">最終更新：12/14 12:00</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article
+    class="report-card"
+    data-report
+    data-date="2025-12-15"
+    data-task="メンテナンス"
+    data-owner="佐藤農園"
+    data-field="ハウス全圃場"
+    data-text="メンテナンス 機械 ハウス 潅水設備 メモ：ポンプの異音あり 要経過観察"
+  >
+    <div class="report-thumb">
+      <img src="https://images.pexels.com/photos/2218814/pexels-photo-2218814.jpeg?auto=compress&cs=tinysrgb&w=800" alt="メンテナンスの様子">
+    </div>
+    <div class="report-content">
+      <div class="report-meta">2025/12/15（月）・ハウス全圃場／佐藤農園</div>
+      <div class="report-title">ハウス潅水設備のメンテナンス</div>
+      <div class="report-tags">
+        <span class="report-tag">メンテナンス</span>
+        <span class="report-tag">設備点検</span>
+      </div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">🌧 雨・室内作業</span>
+          <span class="badge-worker">👩‍🌾 鈴木</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">🕒 10:00〜12:00</span>
+          <span class="badge-updated">最終更新：12/15 12:15</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article
+    class="report-card"
+    data-report
+    data-date="2025-12-16"
+    data-task="収穫"
+    data-owner="高橋アグリサービス"
+    data-field="2号圃場"
+    data-text="ブロッコリー 収穫 メモ：Lサイズ中心で収穫"
+  >
+    <div class="report-thumb">
+      <img src="https://images.pexels.com/photos/839633/pexels-photo-839633.jpeg?auto=compress&cs=tinysrgb&w=800" alt="収穫の様子">
+    </div>
+    <div class="report-content">
+      <div class="report-meta">2025/12/16（火）・2号圃場／高橋アグリサービス</div>
+      <div class="report-title">ブロッコリーの収穫</div>
+      <div class="report-tags">
+        <span class="report-tag">収穫</span>
+        <span class="report-tag">ブロッコリー</span>
+      </div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">☀ 快晴</span>
+          <span class="badge-worker">👨‍🌾 田中</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">🕒 07:00〜10:00</span>
+          <span class="badge-updated">最終更新：12/16 10:30</span>
+        </div>
+      </div>
+    </div>
+  </article>
+</div>
+
+
+            <div class="pagination" id="pagination">
+              <button type="button" id="page-prev">前へ</button>
+              <span id="page-info">1 / 2</span>
+              <button type="button" id="page-next">次へ</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+
+<!-- 日報モーダル群（report_list.html のダイアログレイアウトに合わせる） -->
+
+<!-- 日報詳細モーダル -->
+<div class="modal-backdrop" id="detail-modal-backdrop" aria-hidden="true">
+  <div class="modal" id="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-modal-title">
+    <header class="modal-header">
+      <div class="modal-title-group">
+        <div class="modal-title" id="detail-modal-title">日報詳細</div>
+        <div class="modal-subtitle" id="detail-modal-subtitle">登録済みの日報を確認できます。</div>
+      </div>
+      <button class="modal-close-btn" type="button" id="detail-modal-close" data-modal-close>×</button>
+    </header>
+
+    <div class="modal-body">
+      <div>
+        <div class="detail-section-title">作業の様子</div>
+        <div class="detail-image-wrapper">
+          <img id="detail-image" src="/img/agri-login-bg.png" alt="作業画像（詳細）">
+        </div>
+        <div class="detail-note">
+          <label class="detail-label" for="detail-note-text">作業内容</label>
+          <textarea id="detail-note-text" disabled></textarea>
+        </div>
+      </div>
+
+      <div>
+        <div class="detail-section-title">日報情報</div>
+        <div class="detail-grid">
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-date">日付</label>
+            <input id="detail-date" class="detail-input" type="date" disabled>
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-task">作業カテゴリ</label>
+            <select id="detail-task" class="detail-select" disabled>
+              <option value="">選択してください</option>
+              <option value="施肥">施肥</option>
+              <option value="灌水">灌水</option>
+              <option value="収穫">収穫</option>
+              <option value="除草">除草</option>
+              <option value="防除（農薬散布）">防除（農薬散布）</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-owner">担当者</label>
+            <input id="detail-owner" class="detail-input" type="text" disabled>
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-field">圃場</label>
+            <input id="detail-field" class="detail-input" type="text" disabled>
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-worker">作業者（人数）</label>
+            <input id="detail-worker" class="detail-input" type="text" disabled>
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-weather">天候</label>
+            <input id="detail-weather" class="detail-input" type="text" disabled>
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-time-hours">作業時間（h）</label>
+            <div class="time-duration-wrapper">
+              <input id="detail-time-hours" class="detail-input time-hours-input" type="number" step="0.25" min="0" disabled>
+              <span class="time-duration-unit">h</span>
+            </div>
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-updated-at">最終更新</label>
+            <input id="detail-updated-at" class="detail-input" type="text" disabled>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="detail-footer">
+      <div class="detail-footer-left" id="detail-meta-footer"></div>
+      <div class="detail-footer-right">
+        <button class="btn-secondary" type="button" id="detail-cancel" data-modal-close style="display:none;">閉じる</button>
+        <button class="btn-danger" type="button" id="detail-delete" style="display:none;">
+          <span class="icon">🗑</span>
+          削除
+        </button>
+        <% if (!isRole1) { %>
+          <button class="btn-primary" type="button" id="detail-edit">
+            <span class="btn-icon">✏</span>
+            編集
+          </button>
+        <% } %>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- 新規登録モーダル -->
+<div class="modal-backdrop" id="new-modal-backdrop" aria-hidden="true">
+  <div class="modal" id="new-modal" role="dialog" aria-modal="true" aria-labelledby="new-modal-title">
+    <header class="modal-header">
+      <div class="modal-title-group">
+        <div class="modal-title" id="new-modal-title">日報を新規登録</div>
+        <div class="modal-subtitle" id="new-modal-subtitle">作業内容を入力し、新しい日報として登録します。</div>
+      </div>
+      <button class="modal-close-btn" type="button" id="new-modal-close" data-modal-close>×</button>
+    </header>
+
+    <div class="modal-body">
+      <div>
+        <div class="detail-section-title">作業の様子</div>
+        <div class="detail-image-wrapper">
+          <img id="new-image" src="/img/agri-login-bg.png" alt="作業画像（新規）">
+        </div>
+        <div class="detail-note">
+          <label class="detail-label" for="new-note-text">作業内容</label>
+          <textarea id="new-note-text"></textarea>
+        </div>
+      </div>
+
+      <div>
+        <div class="detail-section-title">日報情報</div>
+        <form id="report-create-form">
+          <div class="detail-grid">
+            <div class="detail-form-group">
+              <label class="detail-label" for="new-date">日付</label>
+              <input id="new-date" class="detail-input" type="date" name="date" required>
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="new-task">作業カテゴリ</label>
+              <select id="new-task" class="detail-select" name="task" required>
+                <option value="">選択してください</option>
+                <option value="施肥">施肥</option>
+                <option value="灌水">灌水</option>
+                <option value="収穫">収穫</option>
+                <option value="除草">除草</option>
+                <option value="防除（農薬散布）">防除（農薬散布）</option>
+                <option value="その他">その他</option>
+              </select>
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="new-owner">担当者</label>
+              <input id="new-owner" class="detail-input" type="text" name="owner">
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="new-field">圃場</label>
+              <input id="new-field" class="detail-input" type="text" name="field">
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="new-worker">作業者（人数）</label>
+              <input id="new-worker" class="detail-input" type="text" name="worker">
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="new-weather">天候</label>
+              <input id="new-weather" class="detail-input" type="text" name="weather">
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="new-time-hours">作業時間（h）</label>
+              <div class="time-duration-wrapper">
+                <input id="new-time-hours" class="detail-input time-hours-input" type="number" step="0.25" min="0" name="hours">
+                <span class="time-duration-unit">h</span>
+              </div>
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label">画像</label>
+              <label class="detail-image-upload-label" for="new-image-file">
+                <span class="icon">📷</span> 画像を選択
+              </label>
+              <input id="new-image-file" class="detail-image-upload-input" type="file" accept="image/*">
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <footer class="detail-footer">
+      <div class="detail-footer-left" id="new-message"></div>
+      <div class="detail-footer-right">
+        <button class="btn-secondary" type="button" id="new-cancel" data-modal-close>キャンセル</button>
+        <button class="btn-primary" type="button" id="new-save">
+          <span class="btn-icon">💾</span>
+          登録する
+        </button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal-backdrop" id="edit-modal-backdrop" aria-hidden="true">
+  <div class="modal" id="edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+    <header class="modal-header">
+      <div class="modal-title-group">
+        <div class="modal-title" id="edit-modal-title">日報を編集</div>
+        <div class="modal-subtitle" id="edit-modal-subtitle">内容を編集して保存します。</div>
+      </div>
+      <button class="modal-close-btn" type="button" id="edit-modal-close" data-modal-close>×</button>
+    </header>
+
+    <div class="modal-body">
+      <div>
+        <div class="detail-section-title">作業の様子</div>
+        <div class="detail-image-wrapper">
+          <img id="edit-image" src="/img/agri-login-bg.png" alt="作業画像（編集）">
+        </div>
+        <div class="detail-note">
+          <label class="detail-label" for="edit-note-text">作業内容</label>
+          <textarea id="edit-note-text"></textarea>
+        </div>
+      </div>
+
+      <div>
+        <div class="detail-section-title">日報情報</div>
+        <form id="report-edit-form">
+          <input type="hidden" id="edit-target-id" name="targetId">
+          <div class="detail-grid">
+            <div class="detail-form-group">
+              <label class="detail-label" for="edit-date">日付</label>
+              <input id="edit-date" class="detail-input" type="date" name="date" required>
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="edit-task">作業カテゴリ</label>
+              <select id="edit-task" class="detail-select" name="task" required>
+                <option value="">選択してください</option>
+                <option value="施肥">施肥</option>
+                <option value="灌水">灌水</option>
+                <option value="収穫">収穫</option>
+                <option value="除草">除草</option>
+                <option value="防除（農薬散布）">防除（農薬散布）</option>
+                <option value="その他">その他</option>
+              </select>
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="edit-owner">担当者</label>
+              <input id="edit-owner" class="detail-input" type="text" name="owner">
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="edit-field">圃場</label>
+              <input id="edit-field" class="detail-input" type="text" name="field">
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="edit-worker">作業者（人数）</label>
+              <input id="edit-worker" class="detail-input" type="text" name="worker">
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="edit-weather">天候</label>
+              <input id="edit-weather" class="detail-input" type="text" name="weather">
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="edit-time-hours">作業時間（h）</label>
+              <div class="time-duration-wrapper">
+                <input id="edit-time-hours" class="detail-input time-hours-input" type="number" step="0.25" min="0" name="hours">
+                <span class="time-duration-unit">h</span>
+              </div>
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label">画像</label>
+              <label class="detail-image-upload-label" for="edit-image-file">
+                <span class="icon">📷</span> 画像を選択
+              </label>
+              <input id="edit-image-file" class="detail-image-upload-input" type="file" accept="image/*">
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <footer class="detail-footer">
+      <div class="detail-footer-left" id="edit-message"></div>
+      <div class="detail-footer-right">
+        <button class="btn-secondary" type="button" id="edit-cancel" data-modal-close>キャンセル</button>
+        <button class="btn-primary" type="button" id="edit-save">
+          <span class="btn-icon">💾</span>
+          保存する
+        </button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+
+  </div>
+</main>
+
+<%- include('../partials/footer') %>
+<%- include('../partials/scripts', { pageJs: "report" }) %>

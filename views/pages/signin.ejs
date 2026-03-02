@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= title || 'ログイン' %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/css/common.css" />
+  <link rel="stylesheet" href="/static/css/pages/signin.css" />
+</head>
+
+<body class="signin">
+  <main class="main">
+    <div class="auth-card">
+
+      <h1 class="auth-title">
+        <div class="logo-area">
+          <img src="/static/img/logo.png" alt="Logo" class="logo-circle" onerror="this.style.display='none'">
+          <div class="logo-text">Agrimo</div>
+        </div>
+      </h1>
+      <p class="auth-subtitle">メールアドレスとパスワードを入力してください。</p>
+
+      <% if (error) { %>
+        <p class="signin-error"><%= error %></p>
+      <% } %>
+
+      <form action="/signin" method="post">
+        <div class="form-group">
+          <label class="form-label">メールアドレス <span class="required">*</span></label>
+          <input type="email" name="email" class="form-input" placeholder="you@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            パスワード <span class="required">*</span>
+          </label>
+
+          <div class="password-wrapper">
+            <input
+              type="password"
+              name="password"
+              class="form-input"
+              placeholder="••••••••"
+              required
+              id="passwordInput"
+            >
+
+            <button
+              type="button"
+              class="password-toggle"
+              onclick="togglePassword()"
+              aria-label="パスワード表示切替"
+            >
+              👁
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn-primary">ログイン</button>
+      </form>
+
+      <p class="auth-footer-text">※ ご不明点は管理者へお問い合わせください。</p>
+    </div>
+  </main>
+</body>
+</html>
+<%- include('../partials/scripts', { pageJs: "signin" }) %>

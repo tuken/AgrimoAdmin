@@ -1,0 +1,200 @@
+/*
+  ログイン画面：テンプレの雰囲気を維持しつつ、
+  背景は public/img/agri-login-bg.png を使用。
+  レイアウトは「mainが担当」、bodyは背景担当に統一する。
+*/
+
+html, body { height: 100%; }
+
+body.signin {
+  min-height: 100vh;
+  margin: 0;
+  position: relative;
+
+  /* 背景画像を “中央より下” を見せる */
+  background-image: url("/static/img/agri-login-bg.png");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: 50% 88%;
+  background-attachment: fixed;
+
+  /* 余計な display:flex は付けない（崩れの原因） */
+}
+
+/* うっすらオーバーレイ（背景を殺さない濃さ） */
+body.signin::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 35% 18%,
+      rgba(255,255,255,0.55) 0%,
+      rgba(235,242,255,0.30) 45%,
+      rgba(225,235,255,0.12) 100%);
+  z-index: 0;
+}
+
+/* 中身を前に */
+body.signin > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== ここがレイアウトの本体：テンプレ通り main で制御 ===== */
+.main {
+  min-height: 100vh; /* 画面全高 */
+  display: grid;
+  place-items: center; /* まず中央 */
+
+  /* “中央より下” へ：カードだけ少し下げる */
+  padding: 24px 16px 32px;
+}
+
+/* カードを「少し下」にずらす（全体を崩さず） */
+.auth-card {
+  width: min(430px, 100%);
+  padding: 32px 26px 28px;
+  border-radius: 24px;
+
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 28px rgba(30, 41, 59, 0.25);
+
+  /* “中央より下” の決め手：これでズレない */
+  transform: translateY(clamp(24px, 10vh, 120px));
+}
+
+.auth-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.auth-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin: 0 0 20px;
+}
+
+.form-group { margin-bottom: 16px; }
+
+.form-label {
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+  display: block;
+  color: var(--text-main);
+}
+
+.required {
+  color: #ef4444;
+  margin-left: 4px;
+  font-size: 0.75rem;
+}
+
+.form-input {
+  width: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  padding: 12px 16px;
+  font-size: 16px; /* iOS Safari: 16px未満だとズームされる */
+  outline: none;
+  background: rgba(255, 255, 255, 0.72);
+  transition: 0.15s;
+}
+
+.form-input:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(90deg, #111826, #183388);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.15s;
+  box-shadow: 0 10px 25px rgba(17, 24, 39, 0.25);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(90deg, #112426, #186188);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.32);
+}
+
+.signin-error {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  padding: 10px 12px;
+  border-radius: 14px;
+}
+
+.auth-footer-text {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 0.78rem;
+  color: var(--text-sub);
+}
+
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper .form-input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  opacity: 0.6;
+}
+
+.password-toggle:hover {
+  opacity: 1;
+}
+
+/* ===== スマホ最適化 ===== */
+@media (max-width: 600px) {
+  body.signin {
+    background-position: 50% 92%;
+    background-attachment: scroll; /* iOS対策 */
+  }
+
+  .main {
+    padding: 18px 14px 24px;
+  }
+
+  /* スマホは下げすぎると圧迫するので弱める */
+  .auth-card {
+    transform: translateY(clamp(12px, 6vh, 64px));
+    border-radius: 18px;
+    padding: 24px 18px 20px;
+  }
+}
+
+/* 高さが低い端末（横持ち等）は下げない */
+@media (max-height: 700px) {
+  .auth-card {
+    transform: translateY(12px);
+  }
+}

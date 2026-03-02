@@ -1,0 +1,78 @@
+<header class="header">
+  <div class="header-inner container">
+    <div class="header-left">
+      <div class="logo">Agrimo</div>
+    </div>
+
+    <% 
+      // currentPath is set in app middleware: res.locals.currentPath = req.path
+      const p = (typeof currentPath !== 'undefined' && currentPath) ? currentPath : '';
+      const isActive = (route) => p === route || (route !== '/top' && p.startsWith(route + '/'));
+    %>
+
+    <nav class="nav">
+      <a href="/top" class="nav-item <%= isActive('/top') ? 'active' : '' %>">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3 10L12 3L21 10V20H3Z" />
+        </svg>
+        <span>トップ</span>
+      </a>
+
+      <a href="/field_list" class="nav-item <%= isActive('/field_list') ? 'active' : '' %>">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 21s-6-5.5-6-10a6 6 0 1112 0c0 4.5-6 10-6 10z"/>
+          <circle cx="12" cy="11" r="2"/>
+        </svg>
+        <span>圃場一覧</span>
+      </a>
+
+      <a href="/report_list" class="nav-item <%= isActive('/report_list') ? 'active' : '' %>">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="4" y="3" width="16" height="18" rx="2"/>
+          <path d="M8 7h8M8 11h8M8 15h5"/>
+        </svg>
+        <span>日報一覧</span>
+      </a>
+
+      <a href="/user_list" class="nav-item <%= isActive('/user_list') ? 'active' : '' %>">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="9" cy="8" r="4"/>
+          <path d="M17 11a4 4 0 100-8"/>
+          <path d="M2 21c0-4 4-7 7-7s7 3 7 7"/>
+          <path d="M22 21c0-3-3-5-5-5"/>
+        </svg>
+        <span>ユーザー一覧</span>
+      </a>
+    </nav>
+
+    <div class="header-right">
+      <div class="account-wrapper">
+        <button type="button" class="account-pill" aria-haspopup="menu" aria-expanded="false">
+          <svg class="account-pill-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="8" r="4"></circle>
+            <path d="M4 21c0-4.2 3.6-7 8-7s8 2.8 8 7"></path>
+          </svg>
+          <span class="account-pill-email"><%= (user && user.email) ? user.email : (email || 'user@test.com') %></span>
+          <svg class="account-pill-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 9l6 6 6-6"></path>
+          </svg>
+        </button>
+
+        <div class="account-menu" role="menu" aria-label="アカウントメニュー">
+          <button type="button" class="account-menu-item" id="open-profile-modal" role="menuitem">
+            <span class="account-menu-icon">👤</span>
+            プロフィール
+          </button>
+          <button type="button" class="account-menu-item" id="open-password-modal" role="menuitem">
+            <span class="account-menu-icon">🔒</span>
+            パスワード変更
+          </button>
+          <a class="account-menu-item" href="/signout" id="logout-button" role="menuitem">
+            <span class="account-menu-icon">🚪</span>
+            ログアウト
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>

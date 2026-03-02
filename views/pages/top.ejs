@@ -1,0 +1,338 @@
+<%- include('../partials/head', { title: "トップ", pageCss: "top", bodyClass: "" }) %>
+<%- include('../partials/header') %>
+
+<% const isRole1 = (user && Number(user.role_id) === 1); %>
+
+<main>
+<div class="container">
+
+<section class="card weather-card" aria-label="今週の天気">
+  <header class="weather-header">
+    <div class="weather-title-group">
+      <div class="weather-title">今週の天気</div>
+      <div class="weather-meta-chips">
+        <span class="weather-chip">地点：愛媛県 松山市</span>
+        <span class="weather-chip">対象期間：11/4 〜 11/10</span>
+      </div>
+    </div>
+</header>
+
+  <div class="forecast-row">
+    <!-- 1日目：今日扱い（is-today クラス＋バッジ） -->
+    <article class="forecast-card is-today">
+      <div class="forecast-badge-today">今日</div>
+      <div class="forecast-day">火</div>
+      <div class="forecast-date">11/4</div>
+      <div class="forecast-icon-wrapper">
+        <div class="forecast-icon">☀️</div>
+      </div>
+      <div class="forecast-temp-high">22°</div>
+      <div class="forecast-temp-low">14°</div>
+    </article>
+
+    <article class="forecast-card">
+      <div class="forecast-day">水</div>
+      <div class="forecast-date">11/5</div>
+      <div class="forecast-icon-wrapper">
+        <div class="forecast-icon">☀️</div>
+      </div>
+      <div class="forecast-temp-high">21°</div>
+      <div class="forecast-temp-low">13°</div>
+    </article>
+
+    <article class="forecast-card">
+      <div class="forecast-day">木</div>
+      <div class="forecast-date">11/6</div>
+      <div class="forecast-icon-wrapper">
+        <div class="forecast-icon">⛅️</div>
+      </div>
+      <div class="forecast-temp-high">19°</div>
+      <div class="forecast-temp-low">12°</div>
+    </article>
+
+    <article class="forecast-card">
+      <div class="forecast-day">金</div>
+      <div class="forecast-date">11/7</div>
+      <div class="forecast-icon-wrapper">
+        <div class="forecast-icon">🌧</div>
+      </div>
+      <div class="forecast-temp-high">18°</div>
+      <div class="forecast-temp-low">11°</div>
+    </article>
+
+    <article class="forecast-card">
+      <div class="forecast-day">土</div>
+      <div class="forecast-date">11/8</div>
+      <div class="forecast-icon-wrapper">
+        <div class="forecast-icon">💨</div>
+      </div>
+      <div class="forecast-temp-high">20°</div>
+      <div class="forecast-temp-low">12°</div>
+    </article>
+
+    <article class="forecast-card">
+      <div class="forecast-day">日</div>
+      <div class="forecast-date">11/9</div>
+      <div class="forecast-icon-wrapper">
+        <div class="forecast-icon">☀️</div>
+      </div>
+      <div class="forecast-temp-high">23°</div>
+      <div class="forecast-temp-low">15°</div>
+    </article>
+
+    <article class="forecast-card">
+      <div class="forecast-day">月</div>
+      <div class="forecast-date">11/10</div>
+      <div class="forecast-icon-wrapper">
+        <div class="forecast-icon">❄️</div>
+      </div>
+      <div class="forecast-temp-high">10°</div>
+      <div class="forecast-temp-low">4°</div>
+    </article>
+  </div>
+</section>
+
+
+      <% if (!isRole1) { %>
+        <!-- ダッシュボード（外部ビュー） -->
+        <section class="card" aria-label="ダッシュボード">
+          <header class="section-header">
+            <div class="section-title">
+              ダッシュボード（外部ビュー）
+            </div>
+            <div class="section-note">
+              参考ビュー：
+              <a href="https://www.vti.co.jp/img/agri7.png" target="_blank" rel="noreferrer">
+                vti.co.jp/img/agri7.png
+              </a>
+            </div>
+          </header>
+
+          <div class="dashboard-frame-wrapper">
+            <div class="dashboard-frame-inner">
+              <img
+                src="https://www.vti.co.jp/img/agri7.png"
+                alt="AgriLook dashboard"
+                class="dashboard-image"
+              >
+            </div>
+          </div>
+        </section>
+      <% } %>
+
+      <!-- 日報・作業サマリー -->
+      <section class="card" aria-label="日報・作業サマリー">
+        <header class="section-header">
+          <div class="section-title">
+            <svg class="section-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M4 6h16M4 12h10M4 18h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>今日のサマリーと作業状況</span>
+          </div>
+        </header>
+
+        <div class="report-section-grid">
+          <!-- 最近登録された日報（3件） -->
+          <div class="report-column">
+            <div class="report-column-header">
+              <div class="report-column-title">
+                <span class="report-column-title-icon" aria-hidden="true"><svg class="mini-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l3 3v15H7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 3v6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 13h6M9 17h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                <span>最近登録された日報（3件）</span>
+              </div>
+              <div class="report-column-sub">
+                直近の入力状況を一覧で確認できます
+              </div>
+            </div>
+
+            <div class="recent-report-list">
+              <article class="recent-report-card">
+                <div class="recent-report-main">
+                  <div class="recent-report-meta-row">
+                    <span class="recent-report-date">2025-12-04 16:40</span>
+                    <span class="recent-report-field">3号圃場</span>
+                    <span class="recent-report-tag">本日分</span>
+                  </div>
+                  <div class="recent-report-title">
+                    朝の潅水・生育状況の目視確認
+                  </div>
+                  <div class="recent-report-worker">
+                    担当：山田 太郎 ／ 作業時間 1.5h
+                  </div>
+                </div>
+              </article>
+
+              <article class="recent-report-card">
+                <div class="recent-report-main">
+                  <div class="recent-report-meta-row">
+                    <span class="recent-report-date">2025-12-04 15:10</span>
+                    <span class="recent-report-field">2号圃場</span>
+                    <span class="recent-report-tag">本日分</span>
+                  </div>
+                  <div class="recent-report-title">
+                    草刈り（通路・畝間）と畝の状態チェック
+                  </div>
+                  <div class="recent-report-worker">
+                    担当：佐藤 花子 ／ 作業時間 2.0h
+                  </div>
+                </div>
+              </article>
+
+              <article class="recent-report-card">
+                <div class="recent-report-main">
+                  <div class="recent-report-meta-row">
+                    <span class="recent-report-date">2025-12-04 13:25</span>
+                    <span class="recent-report-field">1号圃場</span>
+                    <span class="recent-report-tag">本日分</span>
+                  </div>
+                  <div class="recent-report-title">
+                    追肥（有機肥料）および土壌水分の計測
+                  </div>
+                  <div class="recent-report-worker">
+                    担当：田中 一郎 ／ 作業時間 1.0h
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <!-- 作業別の実績集計（今日 / 今週） -->
+          <div class="report-column">
+            <div class="report-column-header">
+              <div class="report-column-title">
+                <span class="report-column-title-icon" aria-hidden="true"><svg class="mini-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 17v-6M12 17V7M16 17v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                <span>作業別の実績集計</span>
+              </div>
+              <div class="report-column-sub">
+                今日と今週の作業ボリュームを比較できます
+              </div>
+            </div>
+
+            <div class="work-summary-header-row">
+              <div class="report-column-sub">
+                単位：件数ベース（1日報 = 1件）
+              </div>
+              <div class="work-summary-badges">
+                <span class="work-summary-badge active">今日</span>
+                <span class="work-summary-badge">今週累計</span>
+              </div>
+            </div>
+
+            <div class="work-summary-table">
+              <div class="work-summary-row is-header">
+                <div>作業内容</div>
+                <div class="work-summary-value">今日</div>
+                <div class="work-summary-value">今週</div>
+              </div>
+
+              <div class="work-summary-row data">
+                <div class="work-summary-label">
+                  <span class="work-summary-dot"></span>
+                  <span>草刈り</span>
+                </div>
+                <div class="work-summary-value">
+                  3<span class="work-summary-unit">件</span>
+                </div>
+                <div class="work-summary-value">
+                  8<span class="work-summary-unit">件</span>
+                </div>
+              </div>
+
+              <div class="work-summary-row data">
+                <div class="work-summary-label">
+                  <span class="work-summary-dot alt1"></span>
+                  <span>潅水</span>
+                </div>
+                <div class="work-summary-value">
+                  2<span class="work-summary-unit">件</span>
+                </div>
+                <div class="work-summary-value">
+                  6<span class="work-summary-unit">件</span>
+                </div>
+              </div>
+
+              <div class="work-summary-row data">
+                <div class="work-summary-label">
+                  <span class="work-summary-dot alt2"></span>
+                  <span>施肥</span>
+                </div>
+                <div class="work-summary-value">
+                  2<span class="work-summary-unit">件</span>
+                </div>
+                <div class="work-summary-value">
+                  5<span class="work-summary-unit">件</span>
+                </div>
+              </div>
+
+              <div class="work-summary-row data">
+                <div class="work-summary-label">
+                  <span class="work-summary-dot alt1"></span>
+                  <span>収穫</span>
+                </div>
+                <div class="work-summary-value">
+                  1<span class="work-summary-unit">件</span>
+                </div>
+                <div class="work-summary-value">
+                  4<span class="work-summary-unit">件</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 作業実績のトップ3 -->
+          <div class="report-column">
+            <div class="report-column-header">
+              <div class="report-column-title">
+                <span class="report-column-title-icon" aria-hidden="true"><svg class="mini-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v3a4 4 0 0 1-8 0V4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M6 5H4v2a4 4 0 0 0 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 5h2v2a4 4 0 0 1-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 15h4v3h-4z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 21h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                <span>作業実績のトップ3</span>
+              </div>
+              <div class="report-column-sub">
+                今週よく行われている作業ランキング
+              </div>
+            </div>
+
+            <div class="ranking-list">
+              <div class="ranking-item">
+                <div class="ranking-rank rank-1">1位</div>
+                <div class="ranking-main">
+                  <div class="ranking-label">草刈り</div>
+                  <div class="ranking-meta-row">
+                    <span class="ranking-chip">全体の 32%</span>
+                    <span>担当者：3名</span>
+                  </div>
+                </div>
+                <div class="ranking-value">8件</div>
+              </div>
+
+              <div class="ranking-item">
+                <div class="ranking-rank rank-2">2位</div>
+                <div class="ranking-main">
+                  <div class="ranking-label">潅水</div>
+                  <div class="ranking-meta-row">
+                    <span class="ranking-chip">全体の 24%</span>
+                    <span>担当者：2名</span>
+                  </div>
+                </div>
+                <div class="ranking-value">6件</div>
+              </div>
+
+              <div class="ranking-item">
+                <div class="ranking-rank rank-3">3位</div>
+                <div class="ranking-main">
+                  <div class="ranking-label">施肥</div>
+                  <div class="ranking-meta-row">
+                    <span class="ranking-chip">全体の 20%</span>
+                    <span>担当者：2名</span>
+                  </div>
+                </div>
+                <div class="ranking-value">5件</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+</main>
+
+<%- include('../partials/footer') %>
+<%- include('../partials/scripts', { pageJs: "top" }) %>

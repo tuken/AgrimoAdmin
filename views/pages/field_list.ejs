@@ -1,0 +1,544 @@
+<%- include('../partials/head', { title: "圃場一覧", pageCss: "field", bodyClass: "" }) %>
+<%- include('../partials/header') %>
+
+<% const isRole1 = (user && Number(user.role_id) === 1); %>
+
+<main>
+<div class="container">
+      <section class="card" aria-label="圃場一覧">
+        <header class="page-header">
+          <div>
+            <div class="page-title">圃場一覧</div>
+            <div class="page-subtitle">
+              登録されている圃場の一覧です。名称・住所・種別・状態・オーナーで絞り込みできます。カードをクリックすると詳細を表示します。
+            </div>
+          </div>
+
+          <div class="page-header-actions">
+            <% if (isRole1) { %>
+              <button class="primary-button" id="field-create-button" type="button">
+                <span class="icon">＋</span>
+                <span>圃場を登録</span>
+              </button>
+            <% } %>
+
+            <!-- オーナー絞り込み -->
+            <% if (isRole1) { %>
+              <div class="select-wrapper">
+                <select id="owner-filter">
+                  <option value="">すべてのオーナー</option>
+                  <option value="山田農園">山田農園</option>
+                  <option value="佐藤ファーム">佐藤ファーム</option>
+                  <option value="高橋アグリサービス">高橋アグリサービス</option>
+                </select>
+              </div>
+            <% } %>
+
+            <div class="select-wrapper">
+              <select id="field-type-filter">
+                <option value="">すべての種別</option>
+                <option value="paddy">水田</option>
+                <option value="upland">畑（畑地）</option>
+                <option value="vegetable">野菜圃場</option>
+                <option value="fruit">果樹園</option>
+                <option value="greenhouse">ハウス圃場</option>
+                <option value="other">その他</option>
+              </select>
+            </div>
+
+            <div class="select-wrapper">
+              <select id="field-status-filter">
+                <option value="">すべての状態</option>
+                <option value="active">利用中</option>
+                <option value="inactive">一時休止</option>
+                <option value="abandoned">廃止</option>
+              </select>
+            </div>
+
+            <div class="search-input-wrapper">
+              <span class="search-icon">🔍</span>
+              <input
+                type="text"
+                id="field-search"
+                placeholder="圃場名・住所<%= isRole1 ? '・オーナー名' : '' %>などで検索"
+              >
+              <span class="clear-icon" id="field-search-clear">✕</span>
+            </div>
+          </div>
+        </header>
+
+        <header class="list-header-row">
+          <div class="list-header-title">圃場一覧</div>
+          <div class="list-header-meta" id="list-header-meta">6件表示</div>
+        </header>
+
+        <section class="fields-grid" id="fields-grid">
+          <!-- サンプル圃場たち（前回と同じ） -->
+          <article
+            class="field-card"
+            data-field
+            data-id="1"
+            data-name="1号圃場（西側ブロック）"
+            data-code="F-001-W"
+            data-owner="山田農園"
+            data-type="paddy"
+            data-status="active"
+            data-lat="35.6895000"
+            data-lng="139.6917000"
+            data-area="3500.00"
+            data-postal="100-0001"
+            data-address="東京都千代田区千代田1-1"
+            data-note="用水路に近接しており、春先は水量を多めに確保すること。代かき前に水門の点検が必要。"
+            data-updated-at="2025-03-18 10:32"
+            data-created-at="2024-11-02 09:15"
+            data-worker-ids="1,2"
+            data-text="1号圃場 西側ブロック 山田農園 水田 東京都千代田区千代田1-1 F-001-W 利用中"
+          >
+            <div class="field-card-header">
+              <div>
+                <div class="field-name">1号圃場（西側ブロック）</div>
+                <div class="field-code">コード: F-001-W</div>
+              </div>
+            </div>
+            <div class="field-pill-row">
+              <span class="pill pill-type">水田</span>
+              <span class="pill pill-status-active">利用中</span>
+              <% if (isRole1) { %>
+                <span class="pill">山田農園</span>
+              <% } %>
+            </div>
+            <div class="field-meta-row">
+              <span>📍 <span class="field-address">東京都千代田区千代田1-1</span></span>
+              <span>📐 面積: 3,500 ㎡</span>
+              <span>👥 <span class="field-workers-label">作業者: 未登録</span></span>
+            </div>
+            <div class="field-update">最終更新: 2025-03-18 10:32</div>
+          </article>
+
+          <article
+            class="field-card"
+            data-field
+            data-id="2"
+            data-name="2号圃場（ハウスA）"
+            data-code="F-002-GH-A"
+            data-owner="佐藤ファーム"
+            data-type="greenhouse"
+            data-status="active"
+            data-lat="35.7001000"
+            data-lng="139.7500000"
+            data-area="1200.00"
+            data-postal="160-0022"
+            data-address="東京都新宿区新宿3-1-1"
+            data-note="トマト用ハウス。夏場は換気と遮光の設定に注意。灌水設備の点検を月1回実施。"
+            data-updated-at="2025-03-12 15:05"
+            data-created-at="2024-12-10 14:20"
+            data-worker-ids="2"
+            data-text="2号圃場 ハウスA 佐藤ファーム ハウス圃場 東京都新宿区新宿3-1-1 F-002-GH-A 利用中"
+          >
+            <div class="field-card-header">
+              <div>
+                <div class="field-name">2号圃場（ハウスA）</div>
+                <div class="field-code">コード: F-002-GH-A</div>
+              </div>
+            </div>
+            <div class="field-pill-row">
+              <span class="pill pill-type">ハウス圃場</span>
+              <span class="pill pill-status-active">利用中</span>
+              <% if (isRole1) { %>
+                <span class="pill">佐藤ファーム</span>
+              <% } %>
+            </div>
+            <div class="field-meta-row">
+              <span>📍 <span class="field-address">東京都新宿区新宿3-1-1</span></span>
+              <span>📐 面積: 1,200 ㎡</span>
+              <span>👥 <span class="field-workers-label">作業者: 未登録</span></span>
+            </div>
+            <div class="field-update">最終更新: 2025-03-12 15:05</div>
+          </article>
+
+          <article
+            class="field-card"
+            data-field
+            data-id="3"
+            data-name="3号圃場（果樹エリア）"
+            data-code="F-003-FR"
+            data-owner="山田農園"
+            data-type="fruit"
+            data-status="inactive"
+            data-lat="35.7100000"
+            data-lng="139.8000000"
+            data-area="4800.00"
+            data-postal="130-0001"
+            data-address="東京都墨田区吾妻橋1-1-1"
+            data-note="一部樹齢が高い樹があり、剪定計画を見直し予定。現在は一時休止中。"
+            data-updated-at="2025-02-28 09:40"
+            data-created-at="2023-04-18 11:00"
+            data-worker-ids=""
+            data-text="3号圃場 果樹エリア 山田農園 果樹園 東京都墨田区吾妻橋1-1-1 F-003-FR 一時休止"
+          >
+            <div class="field-card-header">
+              <div>
+                <div class="field-name">3号圃場（果樹エリア）</div>
+                <div class="field-code">コード: F-003-FR</div>
+              </div>
+            </div>
+            <div class="field-pill-row">
+              <span class="pill pill-type">果樹園</span>
+              <span class="pill pill-status-inactive">一時休止</span>
+              <% if (isRole1) { %>
+                <span class="pill">山田農園</span>
+              <% } %>
+            </div>
+            <div class="field-meta-row">
+              <span>📍 <span class="field-address">東京都墨田区吾妻橋1-1-1</span></span>
+              <span>📐 面積: 4,800 ㎡</span>
+              <span>👥 <span class="field-workers-label">作業者: 未登録</span></span>
+            </div>
+            <div class="field-update">最終更新: 2025-02-28 09:40</div>
+          </article>
+
+          <article
+            class="field-card"
+            data-field
+            data-id="4"
+            data-name="4号圃場（野菜ローテーション）"
+            data-code="F-004-VG"
+            data-owner="高橋アグリサービス"
+            data-type="vegetable"
+            data-status="active"
+            data-lat="35.7205000"
+            data-lng="139.7100000"
+            data-area="2600.00"
+            data-postal="150-0002"
+            data-address="東京都渋谷区渋谷2-2-2"
+            data-note="年間で葉物と根菜をローテーション。土壌検査の結果は年1回記録。"
+            data-updated-at="2025-03-05 08:10"
+            data-created-at="2024-03-22 10:45"
+            data-worker-ids="3"
+            data-text="4号圃場 野菜ローテーション 高橋アグリサービス 野菜圃場 東京都渋谷区渋谷2-2-2 F-004-VG 利用中"
+          >
+            <div class="field-card-header">
+              <div>
+                <div class="field-name">4号圃場（野菜ローテーション）</div>
+                <div class="field-code">コード: F-004-VG</div>
+              </div>
+            </div>
+            <div class="field-pill-row">
+              <span class="pill pill-type">野菜圃場</span>
+              <span class="pill pill-status-active">利用中</span>
+              <% if (isRole1) { %>
+                <span class="pill">高橋アグリサービス</span>
+              <% } %>
+            </div>
+            <div class="field-meta-row">
+              <span>📍 <span class="field-address">東京都渋谷区渋谷2-2-2</span></span>
+              <span>📐 面積: 2,600 ㎡</span>
+              <span>👥 <span class="field-workers-label">作業者: 未登録</span></span>
+            </div>
+            <div class="field-update">最終更新: 2025-03-05 08:10</div>
+          </article>
+
+          <article
+            class="field-card"
+            data-field
+            data-id="5"
+            data-name="5号圃場（東側畑）"
+            data-code="F-005-UP-E"
+            data-owner="佐藤ファーム"
+            data-type="upland"
+            data-status="abandoned"
+            data-lat="35.7300000"
+            data-lng="139.6800000"
+            data-area="5400.00"
+            data-postal="180-0003"
+            data-address="東京都武蔵野市吉祥寺南町1-1-1"
+            data-note="雑草が繁茂しているため、今後の利用計画検討中。現状は廃止扱い。"
+            data-updated-at="2024-11-30 16:20"
+            data-created-at="2020-07-01 09:00"
+            data-worker-ids=""
+            data-text="5号圃場 東側畑 佐藤ファーム 畑 武蔵野市吉祥寺南町1-1-1 F-005-UP-E 廃止"
+          >
+            <div class="field-card-header">
+              <div>
+                <div class="field-name">5号圃場（東側畑）</div>
+                <div class="field-code">コード: F-005-UP-E</div>
+              </div>
+            </div>
+            <div class="field-pill-row">
+              <span class="pill pill-type">畑（畑地）</span>
+              <span class="pill pill-status-abandoned">廃止</span>
+              <% if (isRole1) { %>
+                <span class="pill">佐藤ファーム</span>
+              <% } %>
+            </div>
+            <div class="field-meta-row">
+              <span>📍 <span class="field-address">東京都武蔵野市吉祥寺南町1-1-1</span></span>
+              <span>📐 面積: 5,400 ㎡</span>
+              <span>👥 <span class="field-workers-label">作業者: 未登録</span></span>
+            </div>
+            <div class="field-update">最終更新: 2024-11-30 16:20</div>
+          </article>
+
+          <article
+            class="field-card"
+            data-field
+            data-id="6"
+            data-name="試験圃場（共同研究）"
+            data-code="F-006-OT-R&D"
+            data-owner="高橋アグリサービス"
+            data-type="other"
+            data-status="active"
+            data-lat="35.7400000"
+            data-lng="139.7200000"
+            data-area="800.00"
+            data-postal="192-0083"
+            data-address="東京都八王子市旭町1-1-1"
+            data-note="大学との共同研究用区画。土壌改良や新規品種の試験に利用。作業内容は別システムにも連携。"
+            data-updated-at="2025-03-01 11:50"
+            data-created-at="2022-05-12 13:30"
+            data-worker-ids="1,3"
+            data-text="試験圃場 共同研究 高橋アグリサービス その他圃場 東京都八王子市旭町1-1-1 F-006-OT-R&D 利用中"
+          >
+            <div class="field-card-header">
+              <div>
+                <div class="field-name">試験圃場（共同研究）</div>
+                <div class="field-code">コード: F-006-OT-R&D</div>
+              </div>
+            </div>
+            <div class="field-pill-row">
+              <span class="pill pill-type">その他</span>
+              <span class="pill pill-status-active">利用中</span>
+              <% if (isRole1) { %>
+                <span class="pill">高橋アグリサービス</span>
+              <% } %>
+            </div>
+            <div class="field-meta-row">
+              <span>📍 <span class="field-address">東京都八王子市旭町1-1-1</span></span>
+              <span>📐 面積: 800 ㎡</span>
+              <span>👥 <span class="field-workers-label">作業者: 未登録</span></span>
+            </div>
+            <div class="field-update">最終更新: 2025-03-01 11:50</div>
+          </article>
+        </section>
+        <!-- 圃場一覧 ページネーション -->
+        <div class="pagination" id="field-pagination">
+          <button type="button" id="field-page-prev">前へ</button>
+          <span id="field-page-info">1 / 1ページ</span>
+          <button type="button" id="field-page-next">次へ</button>
+        </div>
+
+        <div class="empty-message" id="empty-message" style="display:none;">
+          条件に合致する圃場がありません。
+        </div>
+
+      </section>
+    </div>
+</main>
+
+<!-- 圃場登録モーダル（role1のみボタン表示。モーダル自体は常にDOMに置く） -->
+<div class="field-modal-backdrop" id="field-create-backdrop" aria-hidden="true">
+  <div class="field-modal" role="dialog" aria-modal="true" aria-labelledby="field-create-title">
+    <div class="field-modal-header">
+      <div>
+        <div class="field-modal-title" id="field-create-title">圃場を登録</div>
+        <div class="field-modal-subtitle">新しい圃場を追加します</div>
+      </div>
+      <button type="button" class="field-modal-close-btn" id="field-create-close" aria-label="閉じる">×</button>
+    </div>
+
+    <div class="field-modal-body">
+      <!-- left: map (簡易) -->
+      <div>
+        <div class="field-modal-section-title">位置</div>
+        <div class="map-container" id="field-create-map-container">
+          <iframe class="map-frame" id="field-create-map-frame" title="圃場位置" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <div class="map-marker" id="field-create-map-marker" aria-label="位置マーカー"></div>
+        </div>
+        <div class="map-coords" id="field-create-map-coords">lat: -, lng: -</div>
+        <div class="field-hint" style="margin-top:10px; font-size:12px; color:#6b7280;">※ デモ用：緯度/経度を入力すると地図が更新されます</div>
+      </div>
+
+      <!-- right: form -->
+      <div>
+        <div class="field-modal-section-title">基本情報</div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">圃場名</label>
+          <input class="detail-input" id="create-name" type="text" placeholder="例：6号圃場（北側）">
+        </div>
+
+        <div class="detail-inline-row">
+          <div class="detail-form-group">
+            <label class="detail-label">コード</label>
+            <input class="detail-input" id="create-code" type="text" placeholder="例：F-006-N">
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label">面積（㎡）</label>
+            <input class="detail-input" id="create-area" type="number" step="0.01" placeholder="例：1200">
+          </div>
+        </div>
+
+        <div class="detail-inline-row">
+          <div class="detail-form-group">
+            <label class="detail-label">種別</label>
+            <select class="detail-input" id="create-type">
+              <option value="paddy">水田</option>
+              <option value="upland">畑（畑地）</option>
+              <option value="vegetable">野菜圃場</option>
+              <option value="fruit">果樹園</option>
+              <option value="greenhouse">ハウス圃場</option>
+              <option value="other">その他</option>
+            </select>
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label">状態</label>
+            <select class="detail-input" id="create-status">
+              <option value="active">利用中</option>
+              <option value="inactive">一時休止</option>
+              <option value="abandoned">廃止</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">オーナー</label>
+          <input class="detail-input" id="create-owner" type="text" placeholder="例：山田農園">
+        </div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">住所</label>
+          <input class="detail-input" id="create-address" type="text" placeholder="例：東京都渋谷区...">
+        </div>
+
+        <div class="detail-inline-row">
+          <div class="detail-form-group">
+            <label class="detail-label">郵便番号</label>
+            <input class="detail-input" id="create-postal" type="text" placeholder="例：150-0001">
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label">緯度 / 経度</label>
+            <div class="detail-inline-row" style="gap:8px;">
+              <input class="detail-input" id="create-lat" type="number" step="0.0000001" placeholder="lat">
+              <input class="detail-input" id="create-lng" type="number" step="0.0000001" placeholder="lng">
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">備考</label>
+          <textarea class="detail-textarea" id="create-note" placeholder="メモ"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="field-modal-footer">
+      <div class="field-modal-footer-left">
+        <button type="button" class="btn-secondary" id="field-create-cancel">キャンセル</button>
+      </div>
+      <div class="field-modal-footer-right">
+        <button type="button" class="btn-primary-sm" id="field-create-save">登録</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 圃場詳細モーダル（圃場ページ専用。共通アカウントモーダルとCSS衝突しない） -->
+<div class="field-modal-backdrop" id="field-detail-backdrop" aria-hidden="true">
+  <div class="field-modal" role="dialog" aria-modal="true" aria-labelledby="field-detail-title">
+    <div class="field-modal-header">
+      <div>
+        <div class="field-modal-title" id="field-detail-title">圃場詳細</div>
+        <div class="field-modal-subtitle" id="field-detail-subtitle">コード: -</div>
+      </div>
+      <button type="button" class="field-modal-close-btn" id="field-detail-close" aria-label="閉じる">×</button>
+    </div>
+
+    <div class="field-modal-body">
+      <!-- left: map / workers -->
+      <div>
+        <div class="field-modal-section-title">位置</div>
+        <div class="map-container" id="field-map-container">
+          <iframe class="map-frame" id="field-map-frame" title="圃場位置" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <div class="map-marker" id="field-map-marker" aria-label="位置マーカー"></div>
+        </div>
+        <div class="map-coords" id="field-map-coords">lat: -, lng: -</div>
+
+        <div style="height:12px"></div>
+        <div class="field-modal-section-title">作業者</div>
+        <div class="worker-chips" id="field-worker-chips"></div>
+      </div>
+
+      <!-- right: detail -->
+      <div>
+        <div class="field-modal-section-title">基本情報</div>
+        <input type="hidden" id="detail-id" />
+
+        <div class="detail-form-group">
+          <label class="detail-label">圃場名</label>
+          <input class="detail-input" id="detail-name" type="text" disabled>
+        </div>
+
+        <div class="detail-inline-row">
+          <div class="detail-form-group">
+            <label class="detail-label">コード</label>
+            <input class="detail-input" id="detail-code" type="text" disabled>
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label">面積（㎡）</label>
+            <input class="detail-input" id="detail-area" type="number" step="0.01" disabled>
+          </div>
+        </div>
+
+        <div class="detail-inline-row">
+          <div class="detail-form-group">
+            <label class="detail-label">種別</label>
+            <input class="detail-input" id="detail-type" type="text" disabled>
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label">状態</label>
+            <input class="detail-input" id="detail-status" type="text" disabled>
+          </div>
+        </div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">オーナー</label>
+          <input class="detail-input" id="detail-owner" type="text" disabled>
+        </div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">住所</label>
+          <input class="detail-input" id="detail-address" type="text" disabled>
+        </div>
+
+        <div class="detail-inline-row">
+          <div class="detail-form-group">
+            <label class="detail-label">郵便番号</label>
+            <input class="detail-input" id="detail-postal" type="text" disabled>
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label">更新日時</label>
+            <input class="detail-input" id="detail-updated" type="text" disabled>
+          </div>
+        </div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">備考</label>
+          <textarea class="detail-textarea" id="detail-note" disabled></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="field-modal-footer">
+      <div class="field-modal-footer-left">
+        <button type="button" class="btn-secondary" id="field-detail-cancel">閉じる</button>
+      </div>
+      <div class="field-modal-footer-right">
+        <button type="button" class="btn-secondary" id="field-detail-edit">編集</button>
+        <button type="button" class="btn-primary-sm" id="field-detail-save" style="display:none;">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>
+<%- include('../partials/scripts', { pageJs: "field" }) %>

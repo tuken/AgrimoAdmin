@@ -1,0 +1,1230 @@
+    /* ---------- メイン ---------- */
+
+    main {
+      padding: 18px 0 40px;
+    }
+
+    .card {
+      background: var(--glass-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      padding: 18px 16px 16px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .page-title-group {
+      min-width: 0;
+    }
+
+    .page-title-eyebrow {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .page-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .page-title-sub {
+      font-size: 0.78rem;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+
+    .page-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .primary-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      border: none;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      color: #ffffff;
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.35);
+      white-space: nowrap;
+    }
+
+    .primary-button .icon {
+      font-size: 0.9rem;
+    }
+
+    .secondary-button {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: var(--text-sub);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .secondary-button .icon {
+      font-size: 0.8rem;
+    }
+
+    .layout {
+      display: grid;
+/*      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);*/
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    /* ---------- カレンダー ---------- */
+
+    .calendar-card {
+      position: relative;
+/*      overflow: hidden;*/
+    }
+
+    .calendar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+
+    .calendar-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .calendar-title-main {
+      font-size: 0.88rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .calendar-sub {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+    }
+
+.calendar-nav {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  overflow: hidden;
+  white-space: nowrap;       /* ← 追加 */
+}
+
+    .calendar-arrow {
+      border: none;
+      background: transparent;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      color: var(--text-sub);
+    }
+
+.calendar-month-label {
+  font-size: 0.8rem;
+  padding: 0 8px;
+  border-left: 1px solid rgba(148, 163, 184, 0.3);
+  border-right: 1px solid rgba(148, 163, 184, 0.3);
+  white-space: nowrap;       /* ← 追加 */
+}
+
+    .calendar-grid {
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(255, 255, 255, 0.85);
+/*      overflow: hidden;*/
+      box-shadow: 0 6px 16px rgba(148, 163, 184, 0.35);
+      overflow: visible;
+    }
+
+    .calendar-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      background: rgba(15, 23, 42, 0.02);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .calendar-weekday {
+      font-size: 0.7rem;
+      text-align: center;
+      padding: 6px 0;
+      color: var(--text-sub);
+    }
+
+    .calendar-weekday.sun {
+      color: #ef4444;
+    }
+
+    .calendar-weekday.sat {
+      color: #2563eb;
+    }
+
+    .calendar-days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+    }
+
+    .calendar-day {
+      position: relative;
+      min-height: 52px;
+      padding: 4px 4px 6px;
+      border-right: 1px solid rgba(229, 231, 235, 0.7);
+      border-bottom: 1px solid rgba(229, 231, 235, 0.7);
+      cursor: pointer;
+      background: #ffffff;
+      font-size: 0.7rem;
+    }
+
+/*    .calendar-day:nth-child(7n) {
+      border-right: none;
+    }
+*/
+    .calendar-day-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+      margin-bottom: 2px;
+    }
+
+    .calendar-day-number {
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+
+    .calendar-day-badge {
+      font-size: 0.64rem;
+      border-radius: 999px;
+      padding: 1px 5px;
+      background: rgba(37, 99, 235, 0.08);
+      color: #2563eb;
+      white-space: nowrap;
+    }
+
+    .calendar-day.has-reports {
+      background: linear-gradient(
+        to bottom,
+        rgba(37, 99, 235, 0.06),
+        #ffffff 40%
+      );
+    }
+
+    .calendar-day.selected {
+      box-shadow: 0 0 0 2px #2563eb inset;
+      z-index: 1;
+    }
+
+    .calendar-day.today {
+      box-shadow: 0 0 0 1px #111827 inset;
+    }
+
+    .calendar-day-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+    }
+
+    .calendar-tag {
+      font-size: 0.62rem;
+      border-radius: 999px;
+      padding: 1px 5px;
+      background: rgba(15, 23, 42, 0.04);
+      color: #4b5563;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* 絞り込み */
+    .calendar-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .calendar-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      background: rgba(255, 255, 255, 0.9);
+      cursor: pointer;
+      color: var(--text-sub);
+    }
+
+    .calendar-filter.active {
+      background: rgba(37, 99, 235, 0.08);
+      color: #2563eb;
+      border-color: rgba(37, 99, 235, 0.7);
+    }
+
+    .calendar-legend {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 0.66rem;
+      color: var(--text-sub);
+    }
+
+    .legend-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.6);
+    }
+
+.time-duration-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.time-hours-input {
+  max-width: 90px;
+  text-align: right;
+}
+
+.time-duration-unit {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+    /* ---------- 日報一覧 ---------- */
+
+    .reports-card {
+      position: relative;
+      min-height: 200px;
+    }
+
+    .reports-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .reports-header-left {
+      min-width: 0;
+    }
+
+    .reports-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .reports-meta {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+
+    .reports-header-right {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+
+    .search-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .search-field {
+      position: relative;
+    }
+
+    .search-input {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.8);
+      padding: 5px 24px 5px 24px;
+      font-size: 0.78rem;
+      width: 190px;
+      background: rgba(255, 255, 255, 0.95);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.78rem;
+      color: #9ca3af;
+    }
+
+    .search-clear {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      padding: 0;
+      background: rgba(209, 213, 219, 0.85);
+      color: white;
+      display: none;
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .filter-label {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+    }
+
+    .task-select-wrapper {
+      position: relative;
+    }
+
+    .task-select-wrapper select {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.8);
+      padding: 4px 20px 4px 8px;
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.95);
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      cursor: pointer;
+    }
+
+    .task-select-wrapper::after {
+      content: "▾";
+      position: absolute;
+      right: 7px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.7rem;
+      color: #6b7280;
+      pointer-events: none;
+    }
+
+    .reports-list {
+      margin-top: 8px;
+    }
+
+    .empty-message {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      text-align: center;
+      padding: 18px 8px 12px;
+    }
+
+    .reports-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);  /* ← 1列固定に */
+  gap: 10px;
+    }
+
+    @media (max-width: 780px) {
+      .reports-grid {
+    grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .report-card {
+      border-radius: 18px;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 8px 22px rgba(148, 163, 184, 0.35);
+      padding: 10px 10px 8px;
+      display: flex;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s ease,
+        border-color 0.1s ease;
+    }
+
+    .report-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 11px 26px rgba(148, 163, 184, 0.45);
+      border-color: rgba(129, 140, 248, 0.9);
+    }
+
+    .report-thumb {
+      width: 80px;
+      height: 64px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #e5e7eb;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .report-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .report-meta {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      margin-bottom: 1px;
+    }
+
+    .report-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .report-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .report-tag {
+      font-size: 0.64rem;
+      border-radius: 999px;
+      padding: 2px 6px;
+      background: rgba(37, 99, 235, 0.06);
+      color: #1d4ed8;
+    }
+
+    .report-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.68rem;
+      color: var(--text-sub);
+    }
+
+    .report-footer-left {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .badge-weather {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      font-size: 0.64rem;
+      border-radius: 999px;
+      padding: 1px 6px;
+      background: rgba(59, 130, 246, 0.06);
+      color: #2563eb;
+    }
+
+    .badge-worker {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .badge-field {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .report-footer-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-time {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .badge-updated {
+      font-size: 0.62rem;
+      color: #9ca3af;
+    }
+
+    /* ページネーション */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+      font-size: 0.76rem;
+    }
+
+    .pagination button {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.85);
+      background: rgba(255, 255, 255, 0.96);
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      min-width: 64px;
+    }
+
+    .pagination button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    .pagination span {
+      color: var(--text-sub);
+    }
+
+    /* ---------- 詳細モーダル ---------- */
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 90;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    /*
+      NOTE:
+      common.css にはアカウント用の共通モーダル（.modal / .modal__*）が存在する。
+      ユーザー一覧の詳細/編集モーダル（user_list.html互換）は .modal-backdrop 配下だけにスコープし、
+      共通モーダルへ影響しないようにする（ページ差分デグレ防止）。
+    */
+
+    .modal-backdrop .modal {
+      max-width: 780px;
+      width: 100%;
+      background: #f9fafb;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.45);
+      overflow: hidden;
+    }
+
+    .modal-backdrop .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      background: linear-gradient(to right, #eff4ff, #e0ecff);
+    }
+
+    .modal-backdrop .modal-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .modal-backdrop .modal-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .modal-backdrop .modal-subtitle {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+    }
+
+    .modal-backdrop .modal-close-btn {
+      border: none;
+      background: transparent;
+      font-size: 1.1rem;
+      cursor: pointer;
+      color: #6b7280;
+    }
+
+    .modal-backdrop .modal-body {
+      padding: 12px 16px 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 12px;
+    }
+
+    @media (max-width: 780px) {
+      .modal-backdrop .modal-body {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .detail-section-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .detail-image-wrapper {
+      border-radius: 14px;
+      overflow: hidden;
+      background: #e5e7eb;
+      margin-bottom: 8px;
+      max-height: 180px;
+    }
+
+    .detail-image-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 6px 12px;
+      font-size: 0.76rem;
+    }
+
+    @media (max-width: 600px) {
+      .detail-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .detail-label {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      margin-bottom: 2px;
+      display: block;
+    }
+
+    .detail-value {
+      font-size: 0.78rem;
+      padding: 4px 8px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(229, 231, 235, 0.9);
+    }
+
+    .detail-note {
+      margin-top: 6px;
+      font-size: 0.76rem;
+    }
+
+    .detail-note textarea {
+      width: 100%;
+      min-height: 70px;
+      border-radius: 10px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      padding: 6px 8px;
+      font-size: 0.76rem;
+      resize: vertical;
+      background: #ffffff;
+    }
+
+    .detail-footer {
+      padding: 10px 16px 10px 12px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .detail-footer-left {
+      font-size: 0.68rem;
+      color: var(--text-sub);
+    }
+
+    .detail-footer-right {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.35);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-secondary {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.8);
+      background: rgba(255, 255, 255, 0.96);
+      color: var(--text-sub);
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-danger {
+      border-radius: 999px;
+      border: 1px solid rgba(239, 68, 68, 0.85);
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      color: #ffffff;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-danger .icon {
+      font-size: 0.9rem;
+    }
+
+    .btn-icon {
+      font-size: 0.9rem;
+    }
+
+    .badge-inline {
+      font-size: 0.68rem;
+      border-radius: 999px;
+      padding: 2px 7px;
+      background: rgba(15, 23, 42, 0.04);
+      color: #4b5563;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .detail-form-group {
+      margin-bottom: 6px;
+    }
+
+    .detail-input,
+    .detail-select {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      padding: 5px 8px;
+      font-size: 0.78rem;
+      background: #ffffff;
+    }
+
+    .detail-input[disabled],
+    .detail-select[disabled],
+    .detail-note textarea[disabled] {
+      background: #f9fafb;
+      color: #6b7280;
+    }
+
+    .detail-image-upload-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      color: #2563eb;
+    }
+
+    .detail-image-upload-label span.icon {
+      font-size: 0.9rem;
+    }
+
+    .detail-image-upload-input {
+      display: none;
+    }
+
+    .detail-form-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 6px 10px;
+    }
+
+    @media (max-width: 600px) {
+      .detail-form-row {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    /* パスワード変更モーダル用にシンプルレイアウトに上書き */
+    .password-modal .password-modal-body {
+      display: block;
+      padding: 14px 16px 18px;
+    }
+
+    .password-modal .modal-body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 16px 12px; }
+    }
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar-nav {
+  margin-left: auto;           /* 右端に寄せる */
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.calendar-month-label {
+  font-size: 0.8rem;
+  padding: 0 8px;
+  border-left: 1px solid rgba(148, 163, 184, 0.3);
+  border-right: 1px solid rgba(148, 163, 184, 0.3);
+  cursor: pointer;             /* クリックできる感じに */
+}
+.year-month-picker {
+  padding:5px;
+}
+.modal-backdrop .modal-footer {
+  padding:10px;
+  float:right;
+}
+/* スマホ幅ではカレンダーの情報量を減らす */
+@media (max-width: 780px) {
+  .calendar-card {
+    overflow-x: visible;
+    overflow-y: visible;   /* もしくは overflow: unset; でもOK */
+  }
+
+  /* ついでに少し詰めておくと収まりが良くなる */
+  .calendar-day {
+    min-height: 44px;
+    padding: 3px 2px 4px;
+    font-size: 0.65rem;
+    max-width: 59px;
+  }
+
+  .calendar-day-badge {
+    font-size: 0.5rem;
+  }
+
+  .calendar-grid {
+/*    min-width: 420px;  /* ← 全7列が絶対に収まる幅を指定 */*/
+    font-size: 0.65rem;
+  }
+
+
+  /* 日付下のタグ（施肥／灌水など）は一覧で見れば十分なので隠す */
+  .calendar-day-content {
+    display: none;
+  }
+
+  /* 「日報 2件」バッジだけ少し小さめに */
+  .calendar-day-badge {
+    font-size: 0.5rem;
+  }
+}
+
+/* user_list ****************/
+/* ===== 作業者一覧用 追加スタイル ===== */
+
+.user-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.user-list-header-title {
+  font-size: 0.9rem;
+  color: var(--text-sub);
+}
+
+.user-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-search-input {
+  min-width: 220px;
+}
+
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 圃場の複数選択 UI */
+.field-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-selector-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.field-selector-row .detail-select {
+  flex: 1;
+}
+
+.field-selector-row .btn-secondary.small,
+.field-selector-row .btn-primary.small {
+  padding-inline: 10px;
+  padding-block: 5px;
+  font-size: 0.8rem;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  font-size: 0.8rem;
+  color: #374151;
+}
+
+.chip-remove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.chip-remove:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* 作業者カードの調整 */
+.worker-card .report-title {
+  font-size: 0.95rem;
+}
+
+.worker-card .report-meta {
+  font-size: 0.8rem;
+}
+
+.worker-card .badge-row {
+  flex-wrap: wrap;
+}
+
+.worker-card .meta-item {
+  font-size: 0.75rem;
+}
+
+
+
+/* ===== 作業者一覧の見栄えアップ ===== */
+
+.user-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.user-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.user-section-heading {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-sub);
+  padding: 0 2px;
+}
+
+/* ベースの report-card を上書きして「ユーザーカード」っぽくする */
+.worker-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(148, 163, 184, 0.28);
+}
+
+.worker-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(148, 163, 184, 0.4);
+  border-color: rgba(129, 140, 248, 0.95);
+}
+
+.worker-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.worker-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.worker-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.worker-role-pill {
+  font-size: 0.64rem;
+  border-radius: 999px;
+  padding: 2px 7px;
+  border: 1px solid rgba(129, 140, 248, 0.8);
+  background: rgba(129, 140, 248, 0.08);
+  color: #4f46e5;
+}
+
+.worker-email {
+  font-size: 0.78rem;
+  color: var(--text-sub);
+  margin-bottom: 4px;
+}
+
+.worker-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.worker-field-chip {
+  font-size: 0.7rem;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: rgba(15, 23, 42, 0.04);
+  color: #4b5563;
+}
+
+/* 右側メタ情報 */
+.worker-meta {
+  display: grid;
+  grid-auto-rows: min-content;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  text-align: right;
+  min-width: 160px;
+}
+
+.worker-meta-label {
+  opacity: 0.8;
+}
+
+.worker-meta-value {
+  font-weight: 500;
+}
+
+/* スマホ時は縦積み */
+@media (max-width: 600px) {
+  .worker-card {
+    flex-direction: column;
+  }
+  .worker-meta {
+    text-align: left;
+    min-width: 0;
+  }
+}
+#user-pagination {
+  display: flex !important;    /* 常に表示 */
+  justify-content: flex-end;   /* 右寄せ */
+  align-items: center;
+  gap: 12px;
+
+  padding: 16px 8px 0 8px;     /* 上部に余白（好みで調整） */
+}
+
+/* ---- FIX: common.css の .modal{display:none} を上書き（user_list.html互換モーダル用） ---- */
+.modal-backdrop.open .modal{
+  display: block;
+  position: relative;
+  inset: auto;
+}
+
+
+
+/* ---- FIX: account dropdown clickable/visible on user_list ---- */
+

@@ -1,0 +1,71 @@
+<% const u = user || {}; %>
+
+<%- include('./modal', {
+  id: 'profile-modal',
+  modalClass: 'modal--account',
+  title: 'プロフィール',
+  body: `
+    <form class="form" id="profile-form">
+      <div class="form-group">
+        <label class="form-label">メールアドレス <span class="required">*</span></label>
+        <input type="email" name="email" class="form-input" value="${(u.email || '').replace(/"/g, '&quot;')}" placeholder="you@example.com" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">組織名（法人/屋号）</label>
+        <input type="text" class="form-input" value="${(u.name || '').replace(/"/g, '&quot;')}" placeholder="個人（未所属）" readonly>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">姓 <span class="required">*</span></label>
+          <input type="text" name="last_name" class="form-input" value="${(u.last_name || '').replace(/"/g, '&quot;')}" placeholder="山田" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">名 <span class="required">*</span></label>
+          <input type="text" name="first_name" class="form-input" value="${(u.first_name || '').replace(/"/g, '&quot;')}" placeholder="太郎" required>
+        </div>
+      </div>
+
+      <p class="form-help" id="profile-message" aria-live="polite"></p>
+    </form>
+  `,
+  footer: `
+    <button type="button" class="secondary-button" data-modal-close>キャンセル</button>
+    <button type="submit" class="primary-button" form="profile-form">保存</button>
+  `
+}) %>
+
+
+<%- include('./modal', {
+  id: 'password-modal',
+  modalClass: 'modal--account',
+  title: 'パスワード変更',
+  body: `
+    <form class="form" id="password-form">
+      <div class="form-group">
+        <label class="form-label">新しいパスワード <span class="required">*</span></label>
+        <div class="password-wrapper">
+          <input type="password" name="password" class="form-input" placeholder="" minlength="8" required id="newPassword">
+          <button type="button" class="password-toggle" data-pw-toggle="newPassword" aria-label="パスワード表示切替">👁</button>
+        </div>
+        <div class="form-help">※ 8文字以上</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">新しいパスワード（再入力） <span class="required">*</span></label>
+        <div class="password-wrapper">
+          <input type="password" name="password_confirm" class="form-input" placeholder="" minlength="8" required id="newPasswordConfirm">
+          <button type="button" class="password-toggle" data-pw-toggle="newPasswordConfirm" aria-label="パスワード表示切替">👁</button>
+        </div>
+      </div>
+
+      <p class="form-help" id="password-message" aria-live="polite"></p>
+    </form>
+  `,
+  footer: `
+    <button type="button" class="secondary-button" data-modal-close>キャンセル</button>
+    <button type="submit" class="primary-button" form="password-form">変更する</button>
+  `
+}) %>

@@ -1,0 +1,656 @@
+    /* ---------- メイン ---------- */
+
+    main {
+      padding: 18px 0 40px;
+    }
+
+    .card {
+      background: var(--glass-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      padding: 18px 16px;
+      margin-bottom: 20px;
+    }
+
+    @media (min-width: 768px) {
+      .card { padding: 22px 22px; }
+    }
+
+    .page-header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .page-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .page-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+    }
+
+    .page-header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      align-items: center;
+    }
+
+    .primary-button {
+      border-radius: 999px;
+      border: none;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.35);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .primary-button span.icon {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .search-input-wrapper input {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.8);
+      padding: 7px 30px 7px 28px;
+      font-size: 0.8rem;
+      background: rgba(255, 255, 255, 0.95);
+      outline: none;
+    }
+
+    .search-input-wrapper input::placeholder { color: #9ca3af; }
+
+    .search-input-wrapper .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+
+    .search-input-wrapper .clear-icon {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.75rem;
+      color: #9ca3af;
+      cursor: pointer;
+      display: none;
+    }
+
+    .select-wrapper {
+      min-width: 150px;
+    }
+
+    .select-wrapper select {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.8);
+      padding: 7px 26px 7px 10px;
+      font-size: 0.8rem;
+      background: rgba(255, 255, 255, 0.95);
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, #9ca3af 50%),
+                        linear-gradient(135deg, #9ca3af 50%, transparent 50%);
+      background-position: calc(100% - 14px) 11px, calc(100% - 9px) 11px;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+
+    /* ---------- 圃場一覧カード（上品グラス） ---------- */
+
+    .list-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+    }
+
+    .list-header-title { font-weight: 600; }
+
+    .list-header-meta {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+    }
+
+    .fields-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+
+    .field-card {
+      position: relative;
+      padding: 16px 18px;
+      border-radius: 20px;
+
+      background: rgba(255, 255, 255, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(18px) saturate(190%);
+      -webkit-backdrop-filter: blur(18px) saturate(190%);
+
+      background-image:
+        radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.38), transparent 60%),
+        radial-gradient(circle at 100% 100%, rgba(148, 163, 184, 0.15), transparent 55%);
+
+      box-shadow:
+        0 10px 26px rgba(15, 23, 42, 0.22),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.65);
+
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+
+      transition:
+        transform 0.18s ease,
+        box-shadow 0.18s ease,
+        border-color 0.18s ease,
+        background 0.18s ease;
+    }
+
+    .field-card::before {
+      content: "";
+      position: absolute;
+      left: 12%;
+      right: 12%;
+      top: 0;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.75),
+        transparent
+      );
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .field-card::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      border-radius: 0 999px 999px 0;
+      opacity: 0.9;
+    }
+
+    .field-card[data-status="active"]::after {
+      background: linear-gradient(180deg, rgb(0 119 213), rgba(22, 163, 74, 0.75));
+    }
+    .field-card[data-status="inactive"]::after {
+      background: linear-gradient(180deg, rgb(251 210 148), rgba(234, 179, 8, 0.75));
+    }
+    .field-card[data-status="abandoned"]::after {
+      background: linear-gradient(180deg, rgb(133 30 30 / 90%), rgba(185, 28, 28, 0.75));
+    }
+
+    .field-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 255, 255, 0.98);
+      background: rgba(255, 255, 255, 0.26);
+      box-shadow:
+        0 16px 34px rgba(15, 23, 42, 0.30),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.9);
+    }
+
+    .field-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .field-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .field-code {
+      font-size: 0.68rem;
+      color: var(--text-sub);
+      white-space: nowrap;
+    }
+
+    .field-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .pill {
+      font-size: 0.65rem;
+      border-radius: 999px;
+      padding: 2px 6px;
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .pill-type {
+      background: rgba(219, 234, 254, 0.9);
+      border-color: rgba(191, 219, 254, 1);
+      color: #1d4ed8;
+    }
+
+    .pill-status-active {
+      background: rgba(209, 250, 229, 0.9);
+      border-color: rgba(187, 247, 208, 1);
+      color: #047857;
+    }
+
+    .pill-status-inactive {
+      background: rgba(254, 249, 195, 0.9);
+      border-color: rgba(254, 240, 138, 1);
+      color: #92400e;
+    }
+
+    .pill-status-abandoned {
+      background: rgba(254, 226, 226, 0.9);
+      border-color: rgba(254, 202, 202, 1);
+      color: #b91c1c;
+    }
+
+    .field-meta-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 4px;
+      padding-top: 6px;
+      border-top: 1px dashed rgba(209, 213, 219, 0.85);
+      color: var(--text-sub);
+      font-size: 0.7rem;
+    }
+
+    .field-meta-row span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .field-address {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .field-update {
+      margin-top: 4px;
+      font-size: 0.68rem;
+      color: var(--text-sub);
+      text-align: right;
+      font-style: italic;
+    }
+
+    .empty-message {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      padding-top: 8px;
+    }
+
+    /* ---------- モーダル共通 ---------- */
+
+    .field-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 16px;
+    }
+
+    .field-modal-backdrop.open { display: flex; }
+  .field-modal {
+      max-width: 820px;
+      width: 100%;
+      max-height: 100%;
+      background: #f9fafb;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.4);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+.field-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      background: linear-gradient(to right, #eff4ff, #e0ecff);
+    }
+.field-modal-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+.field-modal-subtitle {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+.field-modal-close-btn {
+      border: none;
+      background: transparent;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: #6b7280;
+    }
+.field-modal-body {
+      padding: 12px 16px 16px;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.7fr);
+      gap: 16px;
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 720px) {
+.field-modal-body {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+.field-modal-section-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .detail-form-group {
+      margin-bottom: 8px;
+    }
+
+    .detail-label {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      margin-bottom: 2px;
+    }
+
+    .detail-input,
+    .detail-textarea {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      padding: 6px 8px;
+      font-size: 0.78rem;
+      background: #f9fafb;
+    }
+
+    .detail-textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .detail-inline-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .detail-inline-row .detail-form-group {
+      flex: 1;
+    }
+.field-modal-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 16px 14px;
+      border-top: 1px solid #e5e7eb;
+      background: #f3f4f6;
+      flex-wrap: wrap;
+    }
+.field-modal-footer-left,
+.field-modal-footer-right {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-secondary {
+      border-radius: 999px;
+      font-size: 0.78rem;
+      padding: 6px 12px;
+      cursor: pointer;
+      border: 1px solid #d1d5db;
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .btn-primary-sm {
+      border-radius: 999px;
+      font-size: 0.78rem;
+      padding: 6px 14px;
+      cursor: pointer;
+      border: none;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      box-shadow: 0 5px 14px rgba(37, 99, 235, 0.4);
+    }
+
+    /* Google Maps 埋め込みコンテナ（詳細用） */
+    .map-container {
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 10px 24px rgba(148, 163, 184, 0.7);
+      margin-bottom: 6px;
+      position: relative; /* マーカードラッグ用 */
+    }
+
+    .map-frame {
+      width: 100%;
+      height: 200px;
+      border: 0;
+      pointer-events: none; /* 背景マップはクリック不可（上のマーカーだけ操作） */
+    }
+
+    /* 疑似マーカー（ドラッグで緯度経度更新） */
+    .map-marker {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #ffffff, #2563eb);
+      border: 2px solid #ffffff;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.4);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      cursor: grab;
+      z-index: 2;
+    }
+
+    .map-marker.disabled {
+      cursor: default;
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    .map-marker::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -6px;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.25);
+      filter: blur(3px);
+      z-index: -1;
+    }
+
+    .map-coords {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+
+    /* 作業者チップ */
+    .worker-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .worker-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      font-size: 0.7rem;
+    }
+
+    .worker-chip button {
+      .logo-text { font-size: 0.9rem; }
+      .card { padding: 16px 12px; }
+    }
+/* --- ナビ内アイコン＆ラベル --- */
+.nav-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+}
+
+.nav-item-label {
+  font-size: 0.78rem;
+}
+
+/* --- アカウントピル（field_list 用） --- */
+.account-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: radial-gradient(circle at top left, #0f172a, #111827);
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  cursor: pointer;
+  max-width: 240px;
+}
+
+.account-pill-name {
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.account-pill-role {
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+.account-pill-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-pill-chevron {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.account-pill-icon {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.9);
+  background: linear-gradient(135deg, #1f2937, #020617);
+  flex-shrink: 0;
+}
+
+/* 顔っぽい丸と肩 */
+.account-pill-icon::before,
+.account-pill-icon::after {
+  content: "";
+  position: absolute;
+  background: #e5e7eb;
+}
+
+.account-pill-icon::before {
+  top: 3px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 999px;
+}
+
+.account-pill-icon::after {
+  bottom: 3px;
+  left: 50%;
+  width: 10px;
+  height: 7px;
+  margin-left: -5px;
+  border-radius: 999px 999px 3px 3px;
+  opacity: 0.9;
+}
+
+
+/* --- ページネーション（右寄せ） --- */
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 0.78rem;
+}
+
+.pagination button {
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

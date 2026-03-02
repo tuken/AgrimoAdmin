@@ -1,0 +1,320 @@
+<%- include('../partials/head', { title: "ユーザー一覧", pageCss: "user", bodyClass: "" }) %>
+<%- include('../partials/header') %>
+
+<main>
+<div class="container">
+<section class="card">
+      <header class="page-header">
+        <div class="page-title-group">
+          <div class="page-title-eyebrow">Workers</div>
+          <h1 class="page-title">作業者管理</h1>
+          <div class="page-title-sub">作業者の権限・紐づく圃場・最終ログインを一元管理</div>
+        </div>
+        <div class="page-header-actions">
+          <button class="primary-button" type="button" id="new-user-button">
+            <span class="icon">＋</span>
+            <span>作業者を追加</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- 検索＆件数表示 -->
+<div class="user-list-header">
+  <div class="user-list-header-title">
+    <span id="user-count">全 3 名</span>
+  </div>
+  <div class="user-search-wrapper">
+    <div class="search-field">
+      <span class="search-icon">🔍</span>
+      <input
+        id="user-search"
+        class="search-input"
+        type="text"
+        placeholder="氏名・メールアドレスで検索"
+        autocomplete="off"
+      >
+      <button class="search-clear" id="user-search-clear" type="button">×</button>
+    </div>
+  </div>
+</div>
+
+
+      <!-- 作業者カード一覧 -->
+      <div class="report-list user-list user-sections" id="user-list">
+
+        <!-- オーナーセクション -->
+        <section class="user-section" data-section="owner">
+          <h2 class="user-section-heading">オーナー</h2>
+
+          <article
+            class="report-card worker-card"
+            data-user-id="U001"
+            data-name="佐藤 花子"
+            data-email="hanako@example.com"
+            data-owner="はい"
+            data-fields="1号圃場,2号圃場"
+            data-last-login="2025-12-03 09:12"
+            data-created-at="2024-04-10 14:22"
+          >
+            <div class="worker-main">
+              <div class="worker-name-row">
+                <span class="worker-name">佐藤 花子</span>
+                <span class="worker-role-pill">OWNER</span>
+              </div>
+              <div class="worker-email">hanako@example.com</div>
+              <div class="worker-fields">
+                <span class="worker-field-chip">1号圃場</span>
+                <span class="worker-field-chip">2号圃場</span>
+              </div>
+            </div>
+
+            <div class="worker-meta">
+              <div>
+                <div class="worker-meta-label">最終ログイン</div>
+                <div class="worker-meta-value worker-last-login">2025-12-03 09:12</div>
+              </div>
+              <div>
+                <div class="worker-meta-label">登録日時</div>
+                <div class="worker-meta-value worker-created-at">2024-04-10 14:22</div>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <!-- 作業者セクション -->
+        <section class="user-section" data-section="worker">
+          <h2 class="user-section-heading">作業者</h2>
+
+          <article
+            class="report-card worker-card"
+            data-user-id="U002"
+            data-name="山田 太郎"
+            data-email="taro@example.com"
+            data-owner="いいえ"
+            data-fields="3号圃場"
+            data-last-login="2025-12-01 18:05"
+            data-created-at="2024-08-01 10:03"
+          >
+            <div class="worker-main">
+              <div class="worker-name-row">
+                <span class="worker-name">山田 太郎</span>
+                <span class="worker-role-pill">WORKER</span>
+              </div>
+              <div class="worker-email">taro@example.com</div>
+              <div class="worker-fields">
+                <span class="worker-field-chip">3号圃場</span>
+              </div>
+            </div>
+
+            <div class="worker-meta">
+              <div>
+                <div class="worker-meta-label">最終ログイン</div>
+                <div class="worker-meta-value worker-last-login">2025-12-01 18:05</div>
+              </div>
+              <div>
+                <div class="worker-meta-label">登録日時</div>
+                <div class="worker-meta-value worker-created-at">2024-08-01 10:03</div>
+              </div>
+            </div>
+          </article>
+
+          <article
+            class="report-card worker-card"
+            data-user-id="U003"
+            data-name="田中 花"
+            data-email="hana@example.com"
+            data-owner="いいえ"
+            data-fields="ハウス全圃場"
+            data-last-login="2025-11-28 07:32"
+            data-created-at="2024-09-15 09:00"
+          >
+            <div class="worker-main">
+              <div class="worker-name-row">
+                <span class="worker-name">田中 花</span>
+                <span class="worker-role-pill">WORKER</span>
+              </div>
+              <div class="worker-email">hana@example.com</div>
+              <div class="worker-fields">
+                <span class="worker-field-chip">ハウス全圃場</span>
+              </div>
+            </div>
+
+            <div class="worker-meta">
+              <div>
+                <div class="worker-meta-label">最終ログイン</div>
+                <div class="worker-meta-value worker-last-login">2025-11-28 07:32</div>
+              </div>
+              <div>
+                <div class="worker-meta-label">登録日時</div>
+                <div class="worker-meta-value worker-created-at">2024-09-15 09:00</div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+      <!-- 作業者一覧 ページネーション -->
+      <div class="pagination" id="user-pagination">
+        <button type="button" id="user-page-prev">前へ</button>
+        <span id="user-page-info">1 / 1ページ</span>
+        <button type="button" id="user-page-next">次へ</button>
+      </div>
+
+    </section>
+</div>
+</main>
+
+<%- include('../partials/footer') %>
+
+
+  <!-- ▼ 作業者 新規追加モーダル（user_list.html 互換） -->
+  <div class="modal-backdrop" id="new-user-modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="new-user-modal-title">
+      <header class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-title" id="new-user-modal-title">作業者を追加</div>
+          <div class="modal-subtitle">氏名・メールアドレス・紐づく圃場を設定します。</div>
+        </div>
+        <button class="modal-close-btn" type="button" id="new-user-modal-close">×</button>
+      </header>
+
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-form-group">
+            <label class="detail-label" for="new-user-name">氏名</label>
+            <input id="new-user-name" class="detail-input" type="text" placeholder="例）佐藤 花子">
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label" for="new-user-email">メールアドレス</label>
+            <input id="new-user-email" class="detail-input" type="email" placeholder="例）hanako@example.com">
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label" for="new-user-password">パスワード</label>
+            <input id="new-user-password" class="detail-input" type="password" placeholder="初期パスワード">
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="new-user-owner">オーナー</label>
+            <div>
+              <label style="display:inline-flex;align-items:center;gap:6px;">
+                <input type="checkbox" id="new-user-owner">
+                <span>オーナーとして登録する</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="detail-form-group" id="owner-select-wrapper">
+            <label class="detail-label" for="new-user-owner-select">所属オーナー</label>
+            <select id="new-user-owner-select" class="detail-select">
+              <option value="">オーナーを選択</option>
+            </select>
+          </div>
+
+          <div class="detail-form-group" style="grid-column:1/-1;">
+            <label class="detail-label">紐づく圃場</label>
+            <div class="field-selector">
+              <div class="field-selector-row">
+                <select id="new-field-select" class="detail-select">
+                  <option value="">圃場を選択</option>
+                </select>
+                <button class="btn-secondary small" type="button" id="new-field-add">追加</button>
+              </div>
+              <div class="chip-list" id="new-field-chips"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="detail-footer">
+        <div class="detail-footer-left"></div>
+        <div class="detail-footer-right">
+          <button class="btn-secondary" type="button" id="new-user-cancel">キャンセル</button>
+          <button class="btn-primary" type="button" id="new-user-save">登録する（ダミー）</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ▼ 作業者 詳細モーダル（編集対応） -->
+  <div class="modal-backdrop" id="user-detail-modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="user-detail-modal-title">
+      <header class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-title" id="user-detail-modal-title">作業者詳細</div>
+          <div class="modal-subtitle" id="user-detail-modal-subtitle"></div>
+        </div>
+        <button class="modal-close-btn" type="button" id="user-detail-modal-close">×</button>
+      </header>
+
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-user-name">氏名</label>
+            <input id="detail-user-name" class="detail-input" type="text" disabled>
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-user-email">メールアドレス</label>
+            <input id="detail-user-email" class="detail-input" type="email" disabled>
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-user-owner">オーナー</label>
+            <div>
+              <label style="display:inline-flex;align-items:center;gap:6px;">
+                <input type="checkbox" id="detail-user-owner" disabled>
+                <span>オーナー</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="detail-form-group" id="detail-owner-select-wrapper">
+            <label class="detail-label" for="detail-user-owner-select">所属オーナー</label>
+            <select id="detail-user-owner-select" class="detail-select" disabled>
+              <option value="">オーナーを選択</option>
+            </select>
+          </div>
+
+          <div class="detail-form-group" style="grid-column:1/-1;">
+            <label class="detail-label">紐づく圃場</label>
+            <div class="field-selector">
+              <div class="field-selector-row">
+                <select id="detail-field-select" class="detail-select" disabled>
+                  <option value="">圃場を選択</option>
+                </select>
+                <button class="btn-secondary small" type="button" id="detail-field-add" disabled>追加</button>
+              </div>
+              <div class="chip-list" id="detail-field-chips"></div>
+            </div>
+          </div>
+
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-user-last-login">最終ログイン</label>
+            <input id="detail-user-last-login" class="detail-input" type="text" disabled>
+          </div>
+          <div class="detail-form-group">
+            <label class="detail-label" for="detail-user-created-at">登録日時</label>
+            <input id="detail-user-created-at" class="detail-input" type="text" disabled>
+          </div>
+        </div>
+      </div>
+
+      <footer class="detail-footer">
+        <div class="detail-footer-left">
+          ID: <span id="detail-user-id">-</span>
+        </div>
+        <div class="detail-footer-right">
+          <button class="btn-secondary" type="button" id="user-detail-cancel" style="display:none;">キャンセル</button>
+          <button class="btn-danger" type="button" id="user-detail-delete" style="display:none;">
+            <span class="icon">🗑</span>削除
+          </button>
+          <button class="btn-primary" type="button" id="user-detail-save" style="display:none;">保存（ダミー）</button>
+          <button class="btn-primary" type="button" id="user-detail-edit">
+            <span class="btn-icon">✏</span>編集
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+
+
+<%- include('../partials/scripts', { pageJs: "user" }) %>
