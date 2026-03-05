@@ -4,6 +4,8 @@ const session = require('express-session');
 const morgan = require('morgan');
 require('dotenv').config();
 
+const { requestContextMiddleware } = require('./middleware/requestContext');
+
 // ------------------------------------------------------------
 // Polyfill fetch for Node.js environments that don't have it.
 // - Node 18+: global fetch exists
@@ -55,6 +57,10 @@ app.use(session({
     maxAge: Number(process.env.SESSION_COOKIE_MAXAGE_MS || 7 * 24 * 60 * 60 * 1000)
   }
 }));
+
+// Request context (AsyncLocalStorage)
+// Must be after session middleware so req.sessionID is available.
+app.use(requestContextMiddleware);
 
 // locals for views
 app.use((req, res, next) => {

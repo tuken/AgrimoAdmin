@@ -46,9 +46,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   // --------------------
   let cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : [];
   if (!cards.length && grid) {
-    const reports = await fetchReports(pageRoot);
-    grid.innerHTML = reports.map(toReportCardHtml).join('');
-    cards = Array.from(grid.querySelectorAll('[data-report]'));
+    // GraphQL取得に失敗しても、カレンダー等のUIは動作させる（デグレ防止）
+    try {
+      const reportsLoading = document.querySelector('#reports-loading');
+      if (reportsLoading) reportsLoading.style.display = 'block';
+
+      const reports = await fetchReports(pageRoot);
+      grid.innerHTML = reports.map(toReportCardHtml).join('');
+      cards = Array.from(grid.querySelectorAll('[data-report]'));
+    } catch (e) {
+      console.error('日報一覧の取得に失敗しました:', e);
+      // 取得できなくても、空のまま続行
+      grid.innerHTML = '';
+      cards = [];
+    } finally {
+      const reportsLoading = document.querySelector('#reports-loading');
+      if (reportsLoading) reportsLoading.style.display = 'none';
+    }
   }
 
   // --------------------
@@ -286,7 +300,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       setMessage(createMsg, '', '');
 
       const fd = new FormData(createForm);
-      const data = normalizeFormData(fd);
+      const data = normalizeFormData(fd, createForm);
 
       if (!data.date || !data.task || !data.owner || !data.field) {
         setMessage(createMsg, '必須項目を入力してください', 'error');
@@ -321,7 +335,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const fd = new FormData(editForm);
-      const data = normalizeFormData(fd);
+      const data = normalizeFormData(fd, editForm);
 
       if (!data.date || !data.task || !data.owner || !data.field) {
         setMessage(editMsg, '必須項目を入力してください', 'error');
@@ -370,20 +384,67 @@ function wireModal(backdrop) {
   });
 }
 
-function normalizeFormData(fd) {
+function getSelectedText(selectEl) {
+  if (!selectEl) return '';
+  const opt = selectEl.options?.[selectEl.selectedIndex];
+  return (opt && opt.textContent) ? opt.textContent.trim() : '';
+}
+
+function setSelectByText(selectEl, text) {
+  if (!selectEl || !text) return;
+  const want = String(text).trim();
+  const opts = Array.from(selectEl.options || []);
+  const hit = opts.find(o => (o.textContent || '').trim() === want);
+  if (hit) selectEl.value = hit.value;
+}
+
+function normalizeFormData(fd, formEl) {
   const date = (fd.get('date') || '').toString().trim();
-  const task = (fd.get('task') || '').toString().trim();
-  const owner = (fd.get('owner') || '').toString().trim();
-  const field = (fd.get('field') || '').toString().trim();
+
+  // task: keep ID for future API, but show NAME in UI
+  const taskId = (fd.get('task') || '').toString().trim();
+  const taskName = getSelectedText(formEl?.querySelector('[name="task"]')) || taskId;
+
+  // 担当者: ログインユーザー固定（フォームには hidden の owner_id が入る）
+  const ownerId = (fd.get('owner_id') || '').toString().trim();
+  // disabled input は FormData に乗らないため、表示名はDOMから取得
+  const owner = (formEl?.querySelector('#new-owner')?.value || formEl?.querySelector('#edit-owner')?.value || '').toString().trim() || ownerId;
+
+  // field: keep ID for future API, but show NAME in UI
+  const fieldId = (fd.get('field_id') || fd.get('field') || '').toString().trim();
+  const fieldName = getSelectedText(formEl?.querySelector('[name="field_id"]')) || (fd.get('field') || '').toString().trim();
+
   const title = (fd.get('title') || '').toString().trim();
   const timeStart = (fd.get('timeStart') || '').toString().trim();
   const timeEnd = (fd.get('timeEnd') || '').toString().trim();
   const memo = (fd.get('memo') || '').toString().trim();
 
-  const time = (timeStart || timeEnd) ? `${timeStart || '—'}〜${timeEnd || '—'}` : '';
-  const text = [task, title, field, owner, memo].filter(Boolean).join(' ');
+  // optional masters (kept for future)
+  const cropItemId = (fd.get('crop_item_id') || '').toString().trim();
+  const cropItemName = getSelectedText(formEl?.querySelector('[name="crop_item_id"]')) || '';
+  const weatherCode = (fd.get('weather') || '').toString().trim();
 
-  return { date, task, owner, field, title, timeStart, timeEnd, time, memo, text };
+  const time = (timeStart || timeEnd) ? `${timeStart || '—'}〜${timeEnd || '—'}` : '';
+  const text = [taskName, cropItemName, title, fieldName, owner, memo].filter(Boolean).join(' ');
+
+  return {
+    date,
+    task: taskName,
+    taskId,
+    owner,
+    ownerId,
+    field: fieldName,
+    fieldId,
+    title,
+    timeStart,
+    timeEnd,
+    time,
+    memo,
+    cropItemId,
+    cropItemName,
+    weatherCode,
+    text
+  };
 }
 
 function readCardData(card) {
@@ -424,9 +485,18 @@ function fillEditForm(data) {
   if (!editForm) return;
 
   qs('#edit-date', editForm).value = data.date || '';
-  qs('#edit-task', editForm).value = data.task || '';
+  // select value is ID, but card stores task NAME -> match by option text
+  const taskSel = qs('#edit-task', editForm);
+  if (taskSel) {
+    taskSel.value = '';
+    setSelectByText(taskSel, data.task || '');
+  }
   qs('#edit-owner', editForm).value = data.owner || '';
-  qs('#edit-field', editForm).value = data.field || '';
+  const fieldSel = qs('#edit-field', editForm);
+  if (fieldSel) {
+    fieldSel.value = '';
+    setSelectByText(fieldSel, data.field || '');
+  }
   qs('#edit-title', editForm).value = data.title || '';
   qs('#edit-memo', editForm).value = data.memo || '';
 
@@ -551,24 +621,30 @@ async function initLegacy(listRoot) {
 }
 
 async function fetchReports(listRoot) {
+  const userIdRaw = listRoot?.dataset?.userId;
+  if (!userIdRaw) return [];
+
   const q = `
-    query Reports {
-      reports {
+    query FindWorkReportsByUser($userId: ID!) {
+      findWorkReportsByUser(userId: $userId) {
         id
-        reportDate
-        field { fieldName name }
-        user { firstName lastName email }
-        reportType
+        workDate
+        workType
+        workHours
+        weatherCode
+        workDetail
+        imageURL
+        field { id name }
       }
     }
   `;
 
-  const result = await window.gql(q);
+  const result = await window.gql(q, { userId: String(userIdRaw) });
   if (result.errors) {
-    listRoot.innerHTML = `<div class="report-item"><div class="report-item-title">取得に失敗</div><div class="report-item-meta">${escapeHtml(result.errors[0].message)}</div></div>`;
-    return [];
+    // ここでDOMを書き換えてしまうとカレンダー等も巻き込むので、例外として返す
+    throw new Error(result.errors[0]?.message || 'GraphQL error');
   }
-  return result.data?.reports || [];
+  return result.data?.findWorkReportsByUser || [];
 }
 
 // --------------------
@@ -703,7 +779,7 @@ function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter
 // GraphQL -> 新UIの簡易カード
 // --------------------
 function toReportCardHtml(r) {
-  const date = escapeHtml(r.reportDate ?? r.date ?? '');
+  const date = escapeHtml(r.workDate ?? r.reportDate ?? r.date ?? '');
   const task = escapeHtml(r.reportType ?? r.workType ?? '日報');
   const fieldName = escapeHtml(r.field?.fieldName ?? r.field?.name ?? '');
   const userName = (r.user?.firstName || r.user?.lastName)

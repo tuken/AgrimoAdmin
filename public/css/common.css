@@ -48,6 +48,9 @@ img { max-width: 100%; display: block; }
   margin: 0 auto;
   padding: 0 16px;
 }
+.logo-text {
+  color: #14532d;
+}
 
 /* ---------- Header (共通) ---------- */
 header.header{
@@ -93,7 +96,7 @@ header.header .header-right{
 header.header .logo{
   font-weight: 700;
   letter-spacing: .2px;
-  color: #111827;
+  color: #14532d;
 }
 
 header.header .nav{
@@ -581,4 +584,66 @@ header.header .nav-item.active .nav-icon circle,
 header.header .nav-item.active .nav-icon rect{
   stroke: currentColor;
   fill: none;
+}
+
+
+/* HOSAKU Logo Styling */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.logo-icon {
+  width: 34px;
+  height: 34px;
+}
+
+
+/* Login Logo Styling */
+.login-logo-wrap {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.login-logo {
+  width: 60px;
+  height: 60px;
+}
+
+/* セレクトボックス（選択項目） */
+.select-box {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  padding: 6px 32px 6px 12px;
+  border-radius: 18px;
+  border: 1px solid #cfd6dc;
+  background-color: #f7f9fb;
+
+  font-size: 13px;
+  color: #333;
+
+  cursor: pointer;
+
+  /* ▼矢印 */
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%23666' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
+}
+
+/* hover */
+.select-box:hover {
+  background-color: #eef3f7;
+  border-color: #aab4bd;
+}
+
+/* focus */
+.select-box:focus {
+  outline: none;
+  border-color: #2e7d32;
+  background-color: #fff;
 }

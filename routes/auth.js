@@ -1,5 +1,5 @@
 const express = require('express');
-const { findByEmail, verifyPassword, toSafeUser, updateLastLoginAt } = require('../models/user');
+const { findAuthContextByEmail, verifyPassword, toSafeUser, updateLastLoginAt } = require('../models/user');
 const router = express.Router();
 
 /*
@@ -22,7 +22,8 @@ router.post('/signin', async (req, res) => {
       return res.render('pages/signin', { title: 'サインイン', error: 'メールアドレスとパスワードを入力してください' });
 
     try {
-        const userRow = await findByEmail(email);
+        const ctx = await findAuthContextByEmail(email);
+        const userRow = ctx ? ctx.user : null;
         const ok = await verifyPassword(userRow, password);
         if (!ok) {
             return res.render('pages/signin', { title: 'サインイン', error: 'メールアドレスまたはパスワードが正しくありません' });
@@ -32,6 +33,9 @@ router.post('/signin', async (req, res) => {
         await updateLastLoginAt(userRow.id);
 
         req.session.user = toSafeUser(userRow);
+        // attach org (0/1) and fields (0..N) for downstream (e.g., weather)
+        req.session.user.org = ctx ? ctx.org : null;
+        req.session.user.fields = ctx ? (ctx.fields || []) : [];
         delete req.session.token;
 
         return res.redirect('/top');

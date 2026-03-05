@@ -2,7 +2,7 @@
 // - filter/search/pagination (simple)
 // - field detail modal (click card)
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const grid = document.getElementById('fields-grid');
   if (!grid) return;
 
@@ -76,7 +76,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const metaEl = document.getElementById('list-header-meta');
   const emptyEl = document.getElementById('empty-message');
 
-  const cards = Array.from(grid.querySelectorAll('[data-field]'));
+  let cards = Array.from(grid.querySelectorAll('[data-field]'));
+
+  // ダミーデータを廃止したため、カードが無ければGraphQLから取得
+  if (!cards.length) {
+    const loading = document.getElementById('fields-loading');
+    if (loading) loading.style.display = 'block';
+    try {
+      const fields = await fetchFields(grid);
+      grid.insertAdjacentHTML('beforeend', fields.map(toFieldCardHtml).join(''));
+      cards = Array.from(grid.querySelectorAll('[data-field]'));
+    } catch (e) {
+      console.error('圃場一覧の取得に失敗しました:', e);
+      if (metaEl) metaEl.textContent = '圃場一覧の取得に失敗しました';
+    } finally {
+      if (loading) loading.style.display = 'none';
+    }
+  }
 
   function normalize(s) {
     return String(s ?? '').toLowerCase();
@@ -560,4 +576,94 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
+}
+
+// -----------------------------
+// GraphQL: 圃場一覧取得（ダミー廃止に伴う実データ表示）
+// -----------------------------
+async function fetchFields(gridEl) {
+  const userId = gridEl?.dataset?.userId;
+  if (!userId) return [];
+
+  const q = `
+    query FindFieldsByUser($userId: Int!) {
+      findFieldsByUser(userId: $userId) {
+        id
+        name
+        fieldCode
+        latitude
+        longitude
+        area
+        postalCode
+        address
+        note
+        fieldType { id name }
+      }
+    }
+  `;
+
+  const res = await fetch('/graphql', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ query: q, variables: { userId: Number(userId) } }),
+  });
+
+  const json = await res.json();
+  if (json?.errors?.length) {
+    throw new Error(json.errors[0]?.message || 'GraphQL error');
+  }
+  return json?.data?.findFieldsByUser || [];
+}
+
+function toFieldCardHtml(f) {
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const id = esc(f.id);
+  const name = esc(f.name);
+  const code = esc(f.fieldCode);
+  const area = (Number.isFinite(Number(f.area)) ? Number(f.area).toFixed(2) : '');
+  const lat = esc(f.latitude);
+  const lng = esc(f.longitude);
+  const postal = esc(f.postalCode);
+  const address = esc(f.address);
+  const note = esc(f.note);
+  const typeName = esc(f.fieldType?.name || f.fieldType?.id || '');
+
+  const text = esc([name, code, typeName, address].filter(Boolean).join(' '));
+
+  return `
+    <article
+      class="field-card"
+      data-field
+      data-id="${id}"
+      data-name="${name}"
+      data-code="${code}"
+      data-type="${typeName}"
+      data-status="active"
+      data-lat="${lat}"
+      data-lng="${lng}"
+      data-area="${area}"
+      data-postal="${postal}"
+      data-address="${address}"
+      data-note="${note}"
+      data-text="${text}"
+    >
+      <div class="field-card-header">
+        <div>
+          <div class="field-name">${name || '（名称なし）'}</div>
+          <div class="field-code">コード: ${code || '-'}</div>
+        </div>
+      </div>
+      <div class="field-pill-row">
+        ${typeName ? `<span class="pill pill-type">${typeName}</span>` : ''}
+        <span class="pill pill-status-active">利用中</span>
+      </div>
+      <div class="field-meta-row">
+        <div class="field-meta-left">
+          <div class="field-address">${address || ''}</div>
+          <div class="field-meta">面積: ${area ? area + '㎡' : '-'} </div>
+        </div>
+        <div class="field-actions"><span class="action-chip">詳細</span></div>
+      </div>
+    </article>
+  `;
 }

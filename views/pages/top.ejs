@@ -11,85 +11,48 @@
     <div class="weather-title-group">
       <div class="weather-title">今週の天気</div>
       <div class="weather-meta-chips">
-        <span class="weather-chip">地点：愛媛県 松山市</span>
-        <span class="weather-chip">対象期間：11/4 〜 11/10</span>
+        <span class="weather-chip">地点：<%= (weather && weather.locationLabel) ? weather.locationLabel : '' %></span>
+        <span class="weather-chip">対象期間：<%= (weather && weather.periodLabel) ? weather.periodLabel : '' %></span>
+
+        <% if (fields && fields.length > 1 && !(user && Number(user.role_id) === 1)) { %>
+          <form class="weather-field-switch" method="GET" action="/top" style="display:inline-block;">
+            <select name="field_id" class="select-box weather-field-select" onchange="this.form.submit()">
+              <% fields.forEach(f => { %>
+                <option value="<%= f.id %>" <%= (selectedFieldId && Number(selectedFieldId) === Number(f.id)) ? 'selected' : '' %>>
+                  <%= f.name %>
+                </option>
+              <% }) %>
+            </select>
+          </form>
+        <% } %>
       </div>
     </div>
-</header>
+  </header>
 
-  <div class="forecast-row">
-    <!-- 1日目：今日扱い（is-today クラス＋バッジ） -->
-    <article class="forecast-card is-today">
-      <div class="forecast-badge-today">今日</div>
-      <div class="forecast-day">火</div>
-      <div class="forecast-date">11/4</div>
-      <div class="forecast-icon-wrapper">
-        <div class="forecast-icon">☀️</div>
+  <% if (!weather || !weather.ok) { %>
+    <div class="forecast-row">
+      <div style="padding: 18px 8px; color: rgba(0,0,0,0.65);">
+        <%= (weather && weather.error) ? weather.error : '天気情報を取得できませんでした' %>
       </div>
-      <div class="forecast-temp-high">22°</div>
-      <div class="forecast-temp-low">14°</div>
-    </article>
-
-    <article class="forecast-card">
-      <div class="forecast-day">水</div>
-      <div class="forecast-date">11/5</div>
-      <div class="forecast-icon-wrapper">
-        <div class="forecast-icon">☀️</div>
-      </div>
-      <div class="forecast-temp-high">21°</div>
-      <div class="forecast-temp-low">13°</div>
-    </article>
-
-    <article class="forecast-card">
-      <div class="forecast-day">木</div>
-      <div class="forecast-date">11/6</div>
-      <div class="forecast-icon-wrapper">
-        <div class="forecast-icon">⛅️</div>
-      </div>
-      <div class="forecast-temp-high">19°</div>
-      <div class="forecast-temp-low">12°</div>
-    </article>
-
-    <article class="forecast-card">
-      <div class="forecast-day">金</div>
-      <div class="forecast-date">11/7</div>
-      <div class="forecast-icon-wrapper">
-        <div class="forecast-icon">🌧</div>
-      </div>
-      <div class="forecast-temp-high">18°</div>
-      <div class="forecast-temp-low">11°</div>
-    </article>
-
-    <article class="forecast-card">
-      <div class="forecast-day">土</div>
-      <div class="forecast-date">11/8</div>
-      <div class="forecast-icon-wrapper">
-        <div class="forecast-icon">💨</div>
-      </div>
-      <div class="forecast-temp-high">20°</div>
-      <div class="forecast-temp-low">12°</div>
-    </article>
-
-    <article class="forecast-card">
-      <div class="forecast-day">日</div>
-      <div class="forecast-date">11/9</div>
-      <div class="forecast-icon-wrapper">
-        <div class="forecast-icon">☀️</div>
-      </div>
-      <div class="forecast-temp-high">23°</div>
-      <div class="forecast-temp-low">15°</div>
-    </article>
-
-    <article class="forecast-card">
-      <div class="forecast-day">月</div>
-      <div class="forecast-date">11/10</div>
-      <div class="forecast-icon-wrapper">
-        <div class="forecast-icon">❄️</div>
-      </div>
-      <div class="forecast-temp-high">10°</div>
-      <div class="forecast-temp-low">4°</div>
-    </article>
-  </div>
+    </div>
+  <% } else { %>
+    <div class="forecast-row">
+      <% (weather.days || []).forEach((d) => { %>
+        <article class="forecast-card <%= d.isToday ? 'is-today' : '' %>">
+          <% if (d.isToday) { %><div class="forecast-badge-today">今日</div><% } %>
+          <div class="forecast-day"><%= d.dowJa %></div>
+          <div class="forecast-date"><%= d.md %></div>
+          <div class="forecast-icon-wrapper">
+            <div class="forecast-icon"><%= d.icon %></div>
+          </div>
+          <div class="forecast-temps">
+            <div class="forecast-temp-max"><%= d.tmax %>°</div>
+            <div class="forecast-temp-min"><%= d.tmin %>°</div>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
 </section>
 
 
@@ -120,6 +83,7 @@
         </section>
       <% } %>
 
+      <% if (isRole1) { %>
       <!-- 日報・作業サマリー -->
       <section class="card" aria-label="日報・作業サマリー">
         <header class="section-header">
@@ -330,6 +294,7 @@
           </div>
         </div>
       </section>
+      <% } %>
 
     </div>
 </main>

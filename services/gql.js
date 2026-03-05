@@ -1,25 +1,43 @@
+const { getRequestContext } = require('../middleware/requestContext');
+
 /**
- * Minimal GraphQL client for upstream endpoint.
- * - Forwards Authorization from session.token when present
- * - Optionally forwards GRAPHQL_API_KEY as x-api-key
+ * Call upstream GraphQL endpoint.
+ * Automatically injects session cookie if available in request context.
+ * (Upstream requested: Cookie: session=<id>)
  */
 async function callUpstreamGraphQL({ endpoint, query, variables, headers }) {
+  if (!endpoint) throw new Error('GraphQL endpoint is not set');
+
+  const ctx = getRequestContext();
+  const autoHeaders = {};
+
+  if (ctx && ctx.sessionId) {
+    // Use cookie-based session propagation
+    autoHeaders.Cookie = `session=${ctx.sessionId}`;
+  }
+
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      ...headers
+      'accept': 'application/json',
+      ...autoHeaders,
+      ...(headers || {}),
     },
-    body: JSON.stringify({ query, variables })
+    body: JSON.stringify({ query, variables }),
   });
 
   const text = await res.text();
-  // Upstream might not always return JSON; guard
+
+  // GraphQL should return JSON, but some endpoints may return HTML on misconfig.
+  let json = null;
   try {
-    return { status: res.status, json: JSON.parse(text) };
-  } catch {
-    return { status: res.status, json: { errors: [{ message: 'Upstream did not return JSON', raw: text }] } };
+    json = JSON.parse(text);
+  } catch (e) {
+    json = null;
   }
+
+  return { res, text, json };
 }
 
 module.exports = { callUpstreamGraphQL };

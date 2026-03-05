@@ -31,6 +31,54 @@ async function findByEmail(email) {
   return rows[0] || null;
 }
 
+
+/**
+ * For login context:
+ * - users (single)
+ * - orgs (0/1) via users.org_id
+ * - fields (0..N) via fields.user_id
+ */
+async function findAuthContextByEmail(email) {
+  const user = await findByEmail(email);
+  if (!user) return null;
+
+  // org (optional)
+  let org = null;
+  if (user.org_id) {
+    const orgRows = await query(
+      'SELECT id, name, postal_code, address, note FROM orgs WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      [user.org_id]
+    );
+    org = orgRows[0] || null;
+  }
+
+  // fields (0..N)
+  let fieldRows = [];
+  if (Number(user.role_id) === 1 && user.org_id) {
+    // role_id=1: show all fields in the same org
+    fieldRows = await query(
+      `SELECT f.id, f.name, f.latitude, f.longitude
+       FROM fields f
+       INNER JOIN users u ON u.id = f.user_id
+       WHERE u.org_id = ? AND f.deleted_at IS NULL AND u.deleted_at IS NULL
+       ORDER BY f.id ASC`,
+      [user.org_id]
+    );
+  } else {
+    // role_id>=2: fields owned by the user
+    fieldRows = await query(
+      'SELECT id, name, latitude, longitude FROM fields WHERE user_id = ? AND deleted_at IS NULL ORDER BY id ASC',
+      [user.id]
+    );
+  }
+
+  return {
+    user,
+    org,
+    fields: Array.isArray(fieldRows) ? fieldRows : [],
+  };
+}
+
 async function findById(userId) {
   const rows = await query(
     'SELECT * FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
@@ -93,6 +141,7 @@ module.exports = {
   toSafeUser,
   findById,
   findByEmail,
+  findAuthContextByEmail,
   verifyPassword,
   updateLastLoginAt,
   hashPassword,
