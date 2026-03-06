@@ -11,27 +11,22 @@ body.signin {
   margin: 0;
   position: relative;
 
-  /* 背景画像を “中央より下” を見せる */
-  background-image: url("/static/img/agri-login-bg.png");
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: 50% 88%;
+  /* 共通body背景を完全に打ち消し、ログイン背景だけを使う */
+  background:
+    linear-gradient(180deg, rgba(246, 249, 255, 0.78) 0%, rgba(248, 251, 255, 0.40) 36%, rgba(255, 255, 255, 0.14) 100%),
+    url("/static/img/agri-login-bg.png") no-repeat 50% 88% / cover;
   background-attachment: fixed;
-
-  /* 余計な display:flex は付けない（崩れの原因） */
 }
 
-/* うっすらオーバーレイ（背景を殺さない濃さ） */
+/* うっすらオーバーレイ（左右で段差が出ないよう全面に均一で重ねる） */
 body.signin::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 35% 18%,
-      rgba(255,255,255,0.55) 0%,
-      rgba(235,242,255,0.30) 45%,
-      rgba(225,235,255,0.12) 100%);
+    radial-gradient(circle at 50% 18%, rgba(255,255,255,0.52) 0%, rgba(238,244,255,0.24) 42%, rgba(238,244,255,0.08) 72%, rgba(238,244,255,0.00) 100%),
+    linear-gradient(90deg, rgba(245,248,255,0.18) 0%, rgba(245,248,255,0.18) 100%);
   z-index: 0;
 }
 
@@ -176,7 +171,9 @@ body.signin > * {
 /* ===== スマホ最適化 ===== */
 @media (max-width: 600px) {
   body.signin {
-    background-position: 50% 92%;
+    background:
+      linear-gradient(180deg, rgba(246, 249, 255, 0.88) 0%, rgba(248, 251, 255, 0.56) 38%, rgba(255, 255, 255, 0.20) 100%),
+      url("/static/img/agri-login-bg.png") no-repeat 50% 92% / cover;
     background-attachment: scroll; /* iOS対策 */
   }
 
@@ -220,9 +217,9 @@ body.signin > * {
 
 
 /* Background translucent logo */
-.signin::before {
+body.signin::after {
   content: "";
-  position: absolute;
+  position: fixed;
   top: 20%;
   left: 50%;
   transform: translateX(-50%);
@@ -230,5 +227,16 @@ body.signin > * {
   height: 300px;
   background: url('/static/img/hosaku-logo-bg.svg') no-repeat center;
   background-size: contain;
+  opacity: 0.14;
   pointer-events: none;
+  z-index: 0;
+}
+
+@media (max-width: 600px) {
+  body.signin::after {
+    width: 220px;
+    height: 220px;
+    top: 16%;
+    opacity: 0.10;
+  }
 }

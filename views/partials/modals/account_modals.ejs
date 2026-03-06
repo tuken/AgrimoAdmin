@@ -13,7 +13,7 @@
 
       <div class="form-group">
         <label class="form-label">組織名（法人/屋号）</label>
-        <input type="text" class="form-input" value="${(u.name || '').replace(/"/g, '&quot;')}" placeholder="個人（未所属）" readonly>
+        <input type="text" class="form-input" value="${((u.farm_name || u.name || '個人（未所属）')).replace(/"/g, '&quot;')}">
       </div>
 
       <div class="form-row">
@@ -33,7 +33,7 @@
   `,
   footer: `
     <button type="button" class="secondary-button" data-modal-close>キャンセル</button>
-    <button type="submit" class="primary-button" form="profile-form">保存</button>
+    <button type="submit" class="primary-button primary-button--green" form="profile-form">保存</button>
   `
 }) %>
 
@@ -66,6 +66,6 @@
   `,
   footer: `
     <button type="button" class="secondary-button" data-modal-close>キャンセル</button>
-    <button type="submit" class="primary-button" form="password-form">変更する</button>
+    <button type="submit" class="primary-button primary-button--green" form="password-form">変更する</button>
   `
 }) %>

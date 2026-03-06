@@ -55,7 +55,8 @@
             <circle cx="12" cy="8" r="4"></circle>
             <path d="M4 21c0-4.2 3.6-7 8-7s8 2.8 8 7"></path>
           </svg>
-          <span class="account-pill-email"><%= (user && user.email) ? user.email : (email || 'user@test.com') %></span>
+          <% const displayName = [user && user.last_name ? user.last_name : '', user && user.first_name ? user.first_name : ''].filter(Boolean).join(' '); %>
+          <span class="account-pill-email"><%= displayName || ((user && user.email) ? user.email : (email || 'user@test.com')) %></span>
           <svg class="account-pill-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M6 9l6 6 6-6"></path>
           </svg>

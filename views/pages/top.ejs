@@ -15,7 +15,7 @@
         <span class="weather-chip">対象期間：<%= (weather && weather.periodLabel) ? weather.periodLabel : '' %></span>
 
         <% if (fields && fields.length > 1 && !(user && Number(user.role_id) === 1)) { %>
-          <form class="weather-field-switch" method="GET" action="/top" style="display:inline-block;">
+          <form class="weather-field-switch" method="POST" action="/top/select-field" style="display:inline-block;">
             <select name="field_id" class="select-box weather-field-select" onchange="this.form.submit()">
               <% fields.forEach(f => { %>
                 <option value="<%= f.id %>" <%= (selectedFieldId && Number(selectedFieldId) === Number(f.id)) ? 'selected' : '' %>>

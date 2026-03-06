@@ -7,6 +7,32 @@ const router = express.Router();
 // TOP is protected
 router.use(requireAuth);
 
+// 圃場切替はクエリ文字列を使わず、POST + session に保存する
+router.post('/select-field', (req, res) => {
+  const user = req.session.user || null;
+  const roleType = user ? Number(user.role_id ?? user.role_type ?? user.roleType ?? user.roleId) : NaN;
+  const fields = Array.isArray(user?.fields) ? user.fields : [];
+  const requestedFieldId = Number(req.body?.field_id);
+
+  // role=1 は現時点では組織軸表示。圃場切替は無効化。
+  if (roleType === 1) {
+    return res.redirect('/top');
+  }
+
+  const allowedField = fields.find((f) => Number(f.id) === requestedFieldId);
+
+  if (allowedField) {
+    req.session.selectedFieldId = Number(allowedField.id);
+  } else if (fields.length > 0) {
+    // 不正値や存在しない値は安全側で先頭圃場に戻す
+    req.session.selectedFieldId = Number(fields[0].id);
+  } else {
+    delete req.session.selectedFieldId;
+  }
+
+  return res.redirect('/top');
+});
+
 router.get('/', async (req, res) => {
   const user = req.session.user || null;
   const endpoint = process.env.GRAPHQL_ENDPOINT;
@@ -15,11 +41,7 @@ router.get('/', async (req, res) => {
   const org = user?.org || null;
   const fields = Array.isArray(user?.fields) ? user.fields : [];
 
-  // --- field switch (only for non-role1; role1 will use org in future) ---
-  const qFieldId = req.query.field_id ? Number(req.query.field_id) : NaN;
-  if (!Number.isNaN(qFieldId)) req.session.selectedFieldId = qFieldId;
-
-  const selectedFieldId = req.session.selectedFieldId ? Number(req.session.selectedFieldId) : NaN;
+    const selectedFieldId = req.session.selectedFieldId ? Number(req.session.selectedFieldId) : NaN;
   const selectedField =
     (!Number.isNaN(selectedFieldId) ? fields.find((f) => Number(f.id) === selectedFieldId) : null) ||
     fields[0] ||

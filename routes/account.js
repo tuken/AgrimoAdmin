@@ -13,8 +13,11 @@ router.post('/profile', async (req, res) => {
     const { email, lastName, firstName } = req.body || {};
     const updatedRow = await updateProfile(userId, { email, lastName, firstName });
 
-    // update session
-    req.session.user = toSafeUser(updatedRow);
+    // update session (keep existing session values like fields/org display context)
+    req.session.user = {
+      ...(req.session.user || {}),
+      ...toSafeUser(updatedRow),
+    };
 
     return res.status(200).json({ ok: true, message: '保存しました' });
   } catch (e) {

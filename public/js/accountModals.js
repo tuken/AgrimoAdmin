@@ -142,9 +142,9 @@
           const json = await postJson('/account/profile', { email, lastName, firstName });
           setMessage(profileMsg, json.message || '保存しました', 'ok');
 
-          // Update header email text
+          // Update header display name text
           const headerEmail = qs('.account-pill-email');
-          if (headerEmail) headerEmail.textContent = email;
+          if (headerEmail) headerEmail.textContent = [lastName, firstName].filter(Boolean).join(' ');
 
           // Close after short delay
           setTimeout(function () { closeModal(profileModal); }, 450);

@@ -1,6 +1,15 @@
 const { callUpstreamGraphQL } = require('./gql');
 
-const WEATHER_CODES_QUERY = `
+const WEATHER_CODES_QUERY_V2 = `
+query wc {
+  weathers {
+    code
+    japanese
+  }
+}
+`;
+
+const WEATHER_CODES_QUERY_V1 = `
 query wc {
   weatherCodes {
     code
@@ -9,7 +18,22 @@ query wc {
 }
 `;
 
-const FORECAST_7D_QUERY = `
+const FORECAST_7D_QUERY_V2 = `
+query forecast7d($latitude: Float!, $longitude: Float!, $days: Int!) {
+  forecasts(latitude: $latitude, longitude: $longitude, days: $days) {
+    time
+    temperatureMax
+    temperatureMin
+    precipitationSum
+    weather {
+      code
+      japanese
+    }
+  }
+}
+`;
+
+const FORECAST_7D_QUERY_V1 = `
 query forecast7d($latitude: Float!, $longitude: Float!, $days: Int!) {
   forecasts(latitude: $latitude, longitude: $longitude, days: $days) {
     time
@@ -58,13 +82,20 @@ async function getWeatherCodes({ endpoint, headers }) {
   const now = Date.now();
   if (cache.codes && (now - cache.codesFetchedAt) < CODES_TTL_MS) return cache.codes;
 
-  const result = await callUpstreamGraphQL({ endpoint, query: WEATHER_CODES_QUERY, variables: {}, headers });
+  let result = await callUpstreamGraphQL({ endpoint, query: WEATHER_CODES_QUERY_V2, variables: {}, headers });
 
-  if (result?.json?.errors?.length) {
-    console.error('[weather] weatherCodes errors:', result.json.errors);
+  let list = result?.json?.data?.weathers;
+  if (!Array.isArray(list)) {
+    if (result?.json?.errors?.length) {
+      console.error('[weather] weathers errors:', result.json.errors);
+    }
+    result = await callUpstreamGraphQL({ endpoint, query: WEATHER_CODES_QUERY_V1, variables: {}, headers });
+    if (result?.json?.errors?.length) {
+      console.error('[weather] weatherCodes errors:', result.json.errors);
+    }
+    list = result?.json?.data?.weatherCodes;
   }
 
-  const list = result?.json?.data?.weatherCodes;
   if (!Array.isArray(list)) return null;
 
   const map = {};
@@ -75,26 +106,61 @@ async function getWeatherCodes({ endpoint, headers }) {
   return map;
 }
 
-async function getWeeklyForecast({ endpoint, latitude, longitude, headers, days = 7 }) {
-  const codesMap = await getWeatherCodes({ endpoint, headers });
+async function fetchForecastRows({ endpoint, latitude, longitude, headers, days = 7 }) {
+  const variables = { latitude: Number(latitude), longitude: Number(longitude), days: Number(days) };
 
-  const result = await callUpstreamGraphQL({
+  // New schema first: weather is now a nested object.
+  let result = await callUpstreamGraphQL({
     endpoint,
-    query: FORECAST_7D_QUERY,
-    variables: { latitude: Number(latitude), longitude: Number(longitude), days: Number(days) },
+    query: FORECAST_7D_QUERY_V2,
+    variables,
     headers,
   });
 
-  if (result?.json?.errors?.length) {
-    console.error('[weather] forecasts errors:', result.json.errors);
+  const rowsV2 = result?.json?.data?.forecasts;
+  if (Array.isArray(rowsV2)) {
+    return { rows: rowsV2, version: 'v2', result };
   }
 
-  const rows = result?.json?.data?.forecasts;
+  if (result?.json?.errors?.length) {
+    console.error('[weather] forecasts(v2) errors:', result.json.errors);
+  }
+
+  // Fallback for older upstream schema.
+  result = await callUpstreamGraphQL({
+    endpoint,
+    query: FORECAST_7D_QUERY_V1,
+    variables,
+    headers,
+  });
+
+  const rowsV1 = result?.json?.data?.forecasts;
+  if (Array.isArray(rowsV1)) {
+    return { rows: rowsV1, version: 'v1', result };
+  }
+
+  if (result?.json?.errors?.length) {
+    console.error('[weather] forecasts(v1) errors:', result.json.errors);
+  }
+
+  return { rows: [], version: 'unknown', result };
+}
+
+async function getWeeklyForecast({ endpoint, latitude, longitude, headers, days = 7 }) {
+  const codesMap = await getWeatherCodes({ endpoint, headers }).catch((e) => {
+    console.error('[weather] getWeatherCodes failed:', e);
+    return null;
+  });
+
+  const { rows, result } = await fetchForecastRows({ endpoint, latitude, longitude, headers, days });
+
   const daily = Array.isArray(rows) ? rows : [];
   const daysOut = daily.slice(0, 7).map((r, idx) => {
-    const code = r.weatherCode ?? r.weathercode ?? r.code;
+    const weatherObj = (r && typeof r.weather === 'object' && r.weather) ? r.weather : null;
+    const code = weatherObj?.code ?? r.weatherCode ?? r.weathercode ?? r.code;
     const label = toJstDateLabel(r.time ?? r.date);
-    const desc = codesMap?.[String(code)] || '';
+    const desc = weatherObj?.japanese || codesMap?.[String(code)] || '';
+
     return {
       index: idx,
       isToday: idx === 0,

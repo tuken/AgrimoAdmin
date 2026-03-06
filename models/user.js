@@ -10,6 +10,7 @@ function toSafeUser(row) {
     role_id: row.role_id,
     email: row.email,
     name: row.name,
+    farm_name: row.farm_name,
     last_name: row.last_name,
     first_name: row.first_name,
     postal_code: row.postal_code,
