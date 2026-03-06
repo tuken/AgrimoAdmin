@@ -1144,3 +1144,22 @@
     width: 100%;
   }
 }
+
+
+.detail-image-wrapper--optional {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f3f4f6 100%);
+}
+
+.detail-image-wrapper--optional.is-empty img {
+  display: none;
+}
+
+.detail-image-placeholder {
+  color: #6b7280;
+  font-size: 0.95rem;
+  text-align: center;
+}

@@ -42,28 +42,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const pagination = document.querySelector('#pagination');
 
   // --------------------
-  // データソースの確保（DOMカード -> 無ければGraphQLで簡易カード生成）
+  // データソースの確保（GraphQLから当月分を取得）
   // --------------------
-  let cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : [];
-  if (!cards.length && grid) {
-    // GraphQL取得に失敗しても、カレンダー等のUIは動作させる（デグレ防止）
-    try {
-      const reportsLoading = document.querySelector('#reports-loading');
-      if (reportsLoading) reportsLoading.style.display = 'block';
-
-      const reports = await fetchReports(pageRoot);
-      grid.innerHTML = reports.map(toReportCardHtml).join('');
-      cards = Array.from(grid.querySelectorAll('[data-report]'));
-    } catch (e) {
-      console.error('日報一覧の取得に失敗しました:', e);
-      // 取得できなくても、空のまま続行
-      grid.innerHTML = '';
-      cards = [];
-    } finally {
-      const reportsLoading = document.querySelector('#reports-loading');
-      if (reportsLoading) reportsLoading.style.display = 'none';
-    }
-  }
+  let cards = [];
+  let rerenderCurrentCards = () => {};
 
   // --------------------
   // モーダル（登録 / 詳細 / 編集）
@@ -97,6 +79,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireModal(editModal);
   wireCropVarietyDynamic(createForm);
   wireCropVarietyDynamic(editForm);
+  wireImagePreview({ formEl: createForm, fileInputSelector: '#new-image-file', imageSelector: '#new-image', wrapperSelector: '#new-image-wrapper', placeholderSelector: '#new-image-placeholder' });
+  wireImagePreview({ formEl: editForm, fileInputSelector: '#edit-image-file', imageSelector: '#edit-image', wrapperSelector: '#edit-image-wrapper', placeholderSelector: '#edit-image-placeholder' });
 
   // ESCで閉じる
   document.addEventListener('keydown', function (e) {
@@ -133,33 +117,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     pageSize: 8,
   };
 
-  // 年月ピッカー初期化（カードから範囲推定）
-  const years = extractYears(cards, state.viewYear);
-  if (yearSelect) {
-    yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}年</option>`).join('');
-    yearSelect.value = String(state.viewYear);
-  }
   if (monthSelect) monthSelect.value = String(state.viewMonth);
 
   // --------------------
   // 再描画
   // --------------------
   function rerender({ resetPage = true } = {}) {
-    if (resetPage) state.page = 1;
-    renderCalendar(calDaysRoot, state, cards, () => rerender({ resetPage: true }));
-    applyFiltersAndPagination({
-      cards,
-      state,
-      emptyMessage,
-      headerTitle,
-      headerMeta,
-      pagination,
-      pagePrev,
-      pageNext,
-      pageInfo,
-    });
-    syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
+    rerenderCurrentCards(resetPage);
   }
+
+  async function fetchAndRender({ resetPage = true } = {}) {
+    if (resetPage) state.page = 1;
+    try {
+      const result = await reloadReports({
+        pageRoot,
+        grid,
+        state,
+        emptyMessage,
+        headerTitle,
+        headerMeta,
+        pagination,
+        pagePrev,
+        pageNext,
+        pageInfo,
+        filterAllBtn,
+        searchInput,
+        ownerFilter,
+        fieldFilter,
+        taskFilter,
+        monthLabel,
+        yearSelect,
+        monthSelect,
+        calDaysRoot,
+      });
+      cards = result.cards;
+      rerenderCurrentCards = result.rerenderExternal;
+    } catch (e) {
+      console.error('日報一覧の取得に失敗しました:', e);
+      grid.innerHTML = '';
+      cards = [];
+      rerenderCurrentCards = () => {
+        applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, ownerFilter, fieldFilter, taskFilter });
+        syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
+        renderCalendar(calDaysRoot, state, cards, () => rerender({ resetPage: true }));
+      };
+      rerenderCurrentCards(true);
+    }
+  }
+
+  await fetchAndRender({ resetPage: true });
 
   // --------------------
   // UIイベント
@@ -178,38 +184,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   if (ownerFilter) {
-    ownerFilter.addEventListener('change', () => {
+    ownerFilter.addEventListener('change', async () => {
       state.owner = ownerFilter.value;
-      rerender();
+      state.selectedDate = null;
+      await fetchAndRender();
     });
   }
   if (fieldFilter) {
-    fieldFilter.addEventListener('change', () => {
+    fieldFilter.addEventListener('change', async () => {
       state.field = fieldFilter.value;
-      rerender();
+      state.selectedDate = null;
+      await fetchAndRender();
     });
   }
   if (taskFilter) {
-    taskFilter.addEventListener('change', () => {
+    taskFilter.addEventListener('change', async () => {
       state.task = taskFilter.value;
-      rerender();
+      state.selectedDate = null;
+      await fetchAndRender();
     });
   }
 
   if (btnPrevMonth) {
-    btnPrevMonth.addEventListener('click', () => {
+    btnPrevMonth.addEventListener('click', async () => {
       const d = new Date(state.viewYear, state.viewMonth - 1, 1);
       state.viewYear = d.getFullYear();
       state.viewMonth = d.getMonth();
-      rerender({ resetPage: false });
+      state.selectedDate = null;
+      await fetchAndRender({ resetPage: true });
     });
   }
   if (btnNextMonth) {
-    btnNextMonth.addEventListener('click', () => {
+    btnNextMonth.addEventListener('click', async () => {
       const d = new Date(state.viewYear, state.viewMonth + 1, 1);
       state.viewYear = d.getFullYear();
       state.viewMonth = d.getMonth();
-      rerender({ resetPage: false });
+      state.selectedDate = null;
+      await fetchAndRender({ resetPage: true });
     });
   }
 
@@ -220,15 +231,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   if (applyYm) {
-    applyYm.addEventListener('click', () => {
+    applyYm.addEventListener('click', async () => {
       const y = Number(yearSelect?.value ?? state.viewYear);
       const m = Number(monthSelect?.value ?? state.viewMonth);
       if (Number.isFinite(y) && Number.isFinite(m)) {
         state.viewYear = y;
         state.viewMonth = m;
       }
+      state.selectedDate = null;
       if (ymPicker) ymPicker.hidden = true;
-      rerender({ resetPage: false });
+      await fetchAndRender({ resetPage: true });
     });
   }
   document.addEventListener('click', (e) => {
@@ -271,6 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const dateInput = createForm.querySelector('#new-date');
       if (dateInput) dateInput.value = d;
       syncCropVarietySelect(createForm, '', { id: '', name: '' });
+      resetImagePreview({ imageSelector: '#new-image', wrapperSelector: '#new-image-wrapper', placeholderSelector: '#new-image-placeholder' });
       openModal(createModal);
     });
   }
@@ -379,6 +392,198 @@ document.addEventListener('DOMContentLoaded', async () => {
 function qs(sel, root) { return (root || document).querySelector(sel); }
 function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function startOfMonthKey(year, month0) {
+  return `${year}-${pad2(month0 + 1)}-01`;
+}
+
+function endOfMonthKey(year, month0) {
+  return formatDate(new Date(year, month0 + 1, 0));
+}
+
+function getSelectedLabel(selectEl) {
+  if (!selectEl) return '';
+  const opt = selectEl.options?.[selectEl.selectedIndex];
+  return (opt?.dataset?.label || opt?.textContent || '').trim();
+}
+
+function isNumericLike(value) {
+  return /^\d+$/.test(String(value || '').trim());
+}
+
+function buildReportQuery() {
+  return `
+    query FindWorkReports($startDate: Date!, $endDate: Date!, $ownerID: ID, $fieldID: ID, $workTypeID: ID) {
+      findWorkReports(startDate: $startDate, endDate: $endDate, ownerID: $ownerID, fieldID: $fieldID, workTypeID: $workTypeID) {
+        id
+        workDate
+        workHours
+        workDetail
+        imageURL
+        user {
+          id
+          email
+          firstName
+          lastName
+          farmName
+        }
+        field {
+          id
+          name
+          fieldCode
+        }
+        workType {
+          id
+          name
+          sortOrder
+        }
+        cropVariety {
+          id
+          name
+          cropItem { id name }
+        }
+        weather {
+          code
+          japanese
+        }
+      }
+    }
+  `;
+}
+
+function normalizeReport(r) {
+  const fieldName = String(r?.field?.name || r?.field?.fieldName || '').trim();
+  const fieldId = r?.field?.id != null ? String(r.field.id) : '';
+  const wt = r?.workType;
+  const taskName = String((wt && typeof wt === 'object') ? (wt.name || '') : (r?.reportType || r?.workType || '')).trim() || '日報';
+  const taskId = wt && typeof wt === 'object' && wt.id != null ? String(wt.id) : '';
+  const userName = [r?.user?.lastName, r?.user?.firstName].filter(Boolean).join(' ').trim() || String(r?.user?.farmName || r?.user?.email || '').trim();
+  const ownerId = r?.user?.id != null ? String(r.user.id) : '';
+  const cropVarietyName = String(r?.cropVariety?.name || '').trim();
+  const cropVarietyId = r?.cropVariety?.id != null ? String(r.cropVariety.id) : '';
+  const cropItemName = String(r?.cropVariety?.cropItem?.name || '').trim();
+  const cropItemId = r?.cropVariety?.cropItem?.id != null ? String(r.cropVariety.cropItem.id) : '';
+  const weatherName = String(r?.weather?.japanese || '').trim();
+  const weatherCode = r?.weather?.code != null ? String(r.weather.code) : '';
+  const memo = String(r?.workDetail || '').trim();
+  const date = String(r?.workDate || r?.reportDate || r?.date || '').trim();
+  const hours = Number(r?.workHours);
+  const time = Number.isFinite(hours) && hours > 0 ? `${hours}時間` : '';
+  const title = defaultTitleForTask(taskName, fieldName);
+  const text = [taskName, fieldName, userName, cropItemName, cropVarietyName, memo, weatherName].filter(Boolean).join(' ');
+  return {
+    id: r?.id != null ? String(r.id) : '',
+    date,
+    task: taskName,
+    taskId,
+    owner: userName,
+    ownerId,
+    field: fieldName,
+    fieldId,
+    title,
+    memo,
+    time,
+    cropItemId,
+    cropItemName,
+    cropVarietyId,
+    cropVarietyName,
+    weatherCode,
+    weatherName,
+    imageURL: String(r?.imageURL || '').trim(),
+    text,
+  };
+}
+
+async function reloadReports({ pageRoot, grid, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, filterAllBtn, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, calDaysRoot }) {
+  const loadingEl = document.querySelector('#reports-loading');
+  if (loadingEl) loadingEl.style.display = 'block';
+
+  try {
+    const reports = await fetchReports(pageRoot, state);
+    const normalized = reports.map(normalizeReport);
+    grid.innerHTML = normalized.map(toReportCardHtml).join('');
+    const cards = Array.from(grid.querySelectorAll('[data-report]'));
+
+    const years = extractYears(cards, state.viewYear);
+    if (yearSelect) {
+      yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}年</option>`).join('');
+      yearSelect.value = String(state.viewYear);
+    }
+
+    renderCalendar(calDaysRoot, state, cards, () => rerenderExternal(true));
+    applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, ownerFilter, fieldFilter, taskFilter });
+    syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
+
+    function rerenderExternal(resetPage) {
+      state.page = resetPage ? 1 : state.page;
+      applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, ownerFilter, fieldFilter, taskFilter });
+      syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
+      renderCalendar(calDaysRoot, state, cards, () => rerenderExternal(true));
+    }
+
+    return { cards, rerenderExternal };
+  } finally {
+    if (loadingEl) loadingEl.style.display = 'none';
+  }
+}
+
+
+function resetImagePreview({ imageSelector, wrapperSelector, placeholderSelector }) {
+  const img = qs(imageSelector);
+  const wrapper = qs(wrapperSelector);
+  const placeholder = qs(placeholderSelector);
+  if (img) {
+    img.removeAttribute('src');
+    img.hidden = true;
+  }
+  if (placeholder) placeholder.hidden = false;
+  if (wrapper) wrapper.classList.add('is-empty');
+}
+
+function wireImagePreview({ formEl, fileInputSelector, imageSelector, wrapperSelector, placeholderSelector }) {
+  if (!formEl) return;
+  const fileInput = qs(fileInputSelector);
+  const img = qs(imageSelector);
+  const wrapper = qs(wrapperSelector);
+  const placeholder = qs(placeholderSelector);
+  if (!fileInput || !img || !wrapper || fileInput.dataset.previewWired === '1') return;
+  fileInput.dataset.previewWired = '1';
+
+  const applyEmpty = function () {
+    img.removeAttribute('src');
+    img.hidden = true;
+    if (placeholder) placeholder.hidden = false;
+    wrapper.classList.add('is-empty');
+  };
+
+  const applyFile = function (file) {
+    if (!file) {
+      applyEmpty();
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      img.src = e.target?.result || '';
+      img.hidden = false;
+      if (placeholder) placeholder.hidden = true;
+      wrapper.classList.remove('is-empty');
+    };
+    reader.onerror = applyEmpty;
+    reader.readAsDataURL(file);
+  };
+
+  fileInput.addEventListener('change', function () {
+    applyFile(fileInput.files && fileInput.files[0]);
+  });
+
+  formEl.addEventListener('reset', function () {
+    setTimeout(applyEmpty, 0);
+  });
+
+  applyEmpty();
+}
+
 function openModal(backdrop) {
   if (!backdrop) return;
   backdrop.classList.add('open');
@@ -485,7 +690,13 @@ function readCardData(card) {
   const time = ds.time || qs('.badge-time', card)?.textContent?.replace('🕒', '')?.trim() || '';
   const text = ds.text || [task, cropItemName, cropVarietyName, title, field, owner, memo].filter(Boolean).join(' ');
   const id = ds.reportId || ds.id || '';
-  return { id, date, task, owner, field, title, memo, time, text, cropItemId, cropItemName, cropVarietyId, cropVarietyName };
+  const taskId = ds.taskId || '';
+  const fieldId = ds.fieldId || '';
+  const ownerId = ds.ownerId || '';
+  const weatherCode = ds.weatherCode || '';
+  const weatherName = ds.weatherName || '';
+  const imageURL = ds.imageUrl || '';
+  return { id, date, task, taskId, owner, ownerId, field, fieldId, title, memo, time, text, cropItemId, cropItemName, cropVarietyId, cropVarietyName, weatherCode, weatherName, imageURL };
 }
 
 function fillDetailModal(data) {
@@ -505,7 +716,28 @@ function fillDetailModal(data) {
   if (detailTags) detailTags.innerHTML = tagsHtml || '<span class="report-tag">—</span>';
   if (detailTime) detailTime.textContent = data.time || '—';
   if (detailMemo) detailMemo.textContent = data.memo || '—';
+
+  const img = qs('#detail-image');
+  if (img) {
+    img.src = data.imageURL || '/img/agri-login-bg.png';
+    img.onerror = function () { this.onerror = null; this.src = '/img/agri-login-bg.png'; };
+  }
+  const note = qs('#detail-note-text');
+  if (note) note.value = data.memo || '';
+  const dateEl = qs('#detail-date');
+  if (dateEl) dateEl.value = data.date || '';
+  const taskEl = qs('#detail-task');
+  if (taskEl) { taskEl.value = data.taskId || ''; if (!taskEl.value && data.task) setSelectByText(taskEl, data.task); }
+  const cropItemEl = qs('#detail-crop-item');
+  if (cropItemEl) { cropItemEl.value = data.cropItemId || ''; if (!cropItemEl.value && data.cropItemName) setSelectByText(cropItemEl, data.cropItemName); }
+  const ownerEl = qs('#detail-owner');
+  if (ownerEl) ownerEl.value = data.owner || '';
+  const fieldEl = qs('#detail-field');
+  if (fieldEl) { fieldEl.value = data.fieldId || ''; if (!fieldEl.value && data.field) setSelectByText(fieldEl, data.field); }
+  const weatherEl = qs('#detail-weather');
+  if (weatherEl) { weatherEl.value = data.weatherCode || ''; if (!weatherEl.value && data.weatherName) setSelectByText(weatherEl, data.weatherName); }
 }
+
 
 
 async function fetchCropVarieties(itemID) {
@@ -621,51 +853,14 @@ function fillEditForm(data) {
 
   const hidden = qs('#edit-target-id', editForm);
   if (hidden) hidden.value = data.id || '';
+  resetImagePreview({ imageSelector: '#edit-image', wrapperSelector: '#edit-image-wrapper', placeholderSelector: '#edit-image-placeholder' });
 }
 
 function buildReportCardElement(data) {
-  const el = document.createElement('article');
-  el.className = 'report-card';
-  el.setAttribute('data-report', '');
-  el.dataset.date = data.date;
-  el.dataset.task = data.task;
-  el.dataset.owner = data.owner;
-  el.dataset.field = data.field;
-  el.dataset.title = data.title || '';
-  el.dataset.memo = data.memo || '';
-  el.dataset.time = data.time || '';
-  el.dataset.cropItemId = data.cropItemId || '';
-  el.dataset.cropItemName = data.cropItemName || '';
-  el.dataset.cropVarietyId = data.cropVarietyId || '';
-  el.dataset.cropVarietyName = data.cropVarietyName || '';
-  el.dataset.text = data.text || '';
-
-  const meta = toJaMetaLine(data.date, data.field, data.owner);
-  const title = data.title || defaultTitleForTask(data.task, data.field);
-  const tag = data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '';
-  const timeBadge = data.time ? `🕒 ${escapeHtml(data.time)}` : '🕒 —';
-
-  el.innerHTML = `
-    <div class="report-thumb">
-      <img src="https://images.pexels.com/photos/2255801/pexels-photo-2255801.jpeg?auto=compress&cs=tinysrgb&w=800" alt="${escapeHtml(data.task || '作業')}の様子">
-    </div>
-    <div class="report-content">
-      <div class="report-meta">${escapeHtml(meta)}</div>
-      <div class="report-title">${escapeHtml(title)}</div>
-      <div class="report-tags">${tag || '<span class="report-tag">—</span>'}</div>
-      <div class="report-footer">
-        <div class="report-footer-left">
-          <span class="badge-weather">⛅ —</span>
-          <span class="badge-worker">👨‍🌾 —</span>
-        </div>
-        <div class="report-footer-right">
-          <span class="badge-time">${timeBadge}</span>
-          <span class="badge-updated">最終更新：${formatUpdatedNow()}</span>
-        </div>
-      </div>
-    </div>
-  `;
-  return el;
+  const html = toReportCardHtml(data);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html.trim();
+  return tmp.firstElementChild;
 }
 
 function applyCardUpdate(card, data) {
@@ -677,10 +872,16 @@ function applyCardUpdate(card, data) {
   card.dataset.title = data.title || '';
   card.dataset.memo = data.memo || '';
   card.dataset.time = data.time || '';
+  card.dataset.taskId = data.taskId || '';
+  card.dataset.ownerId = data.ownerId || '';
+  card.dataset.fieldId = data.fieldId || '';
   card.dataset.cropItemId = data.cropItemId || '';
   card.dataset.cropItemName = data.cropItemName || '';
   card.dataset.cropVarietyId = data.cropVarietyId || '';
   card.dataset.cropVarietyName = data.cropVarietyName || '';
+  card.dataset.weatherCode = data.weatherCode || '';
+  card.dataset.weatherName = data.weatherName || '';
+  card.dataset.imageUrl = data.imageURL || '';
   card.dataset.text = data.text || '';
 
   const meta = toJaMetaLine(data.date, data.field, data.owner);
@@ -690,12 +891,18 @@ function applyCardUpdate(card, data) {
   const tagsEl = qs('.report-tags', card);
   const timeEl = qs('.badge-time', card);
   const updEl = qs('.badge-updated', card);
+  const weatherEl = qs('.badge-weather', card);
+  const workerEl = qs('.badge-worker', card);
+  const imgEl = qs('.report-thumb img', card);
 
   if (metaEl) metaEl.textContent = meta;
   if (titleEl) titleEl.textContent = title;
   if (tagsEl) tagsEl.innerHTML = data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '<span class="report-tag">—</span>';
   if (timeEl) timeEl.textContent = data.time ? `🕒 ${data.time}` : '🕒 —';
-  if (updEl) updEl.textContent = `最終更新：${formatUpdatedNow()}`;
+  if (updEl) updEl.textContent = `作付：${data.cropVarietyName || data.cropItemName || '—'}`;
+  if (weatherEl) weatherEl.textContent = `⛅ ${data.weatherName || '—'}`;
+  if (workerEl) workerEl.textContent = `👨‍🌾 ${data.owner || '—'}`;
+  if (imgEl) { imgEl.src = data.imageURL || '/img/agri-login-bg.png'; imgEl.onerror = function () { this.onerror = null; this.src = '/img/agri-login-bg.png'; }; }
 }
 
 function toJaMetaLine(dateKey, field, owner) {
@@ -742,31 +949,31 @@ async function initLegacy(listRoot) {
   renderLegacyReportList(listRoot, reports);
 }
 
-async function fetchReports(listRoot) {
-  const userIdRaw = listRoot?.dataset?.userId;
-  if (!userIdRaw) return [];
+async function fetchReports(listRoot, state) {
+  const query = buildReportQuery();
+  const userIdRaw = String(listRoot?.dataset?.userId || '').trim();
+  const safeState = state || { viewYear: new Date().getFullYear(), viewMonth: new Date().getMonth(), owner: '', field: '', task: '' };
+  const ownerFilterValue = String(safeState?.owner || '').trim();
+  const variables = {
+    startDate: startOfMonthKey(safeState.viewYear, safeState.viewMonth),
+    endDate: endOfMonthKey(safeState.viewYear, safeState.viewMonth),
+  };
 
-  const q = `
-    query FindWorkReportsByUser($userId: ID!) {
-      findWorkReportsByUser(userId: $userId) {
-        id
-        workDate
-        workType
-        workHours
-        weatherCode
-        workDetail
-        imageURL
-        field { id name }
-      }
-    }
-  `;
+  // ownerID はオーナー絞り込みが明示された場合のみ付与する。
+  // 初期表示は startDate / endDate のみで取得し、権限制御はサーバー側に委ねる。
+  // （非管理者で ownerID を自動付与すると upstream 側で 422 になる環境があるため）
+  if (ownerFilterValue && isNumericLike(ownerFilterValue)) {
+    variables.ownerID = ownerFilterValue;
+  }
 
-  const result = await window.gql(q, { userId: String(userIdRaw) });
+  if (safeState?.field && isNumericLike(safeState.field)) variables.fieldID = String(safeState.field);
+  if (safeState?.task && isNumericLike(safeState.task)) variables.workTypeID = String(safeState.task);
+
+  const result = await window.gql(query, variables);
   if (result.errors) {
-    // ここでDOMを書き換えてしまうとカレンダー等も巻き込むので、例外として返す
     throw new Error(result.errors[0]?.message || 'GraphQL error');
   }
-  return result.data?.findWorkReportsByUser || [];
+  return Array.isArray(result.data?.findWorkReports) ? result.data.findWorkReports : [];
 }
 
 // --------------------
@@ -831,18 +1038,21 @@ function renderCalendar(root, state, cards, onSelectDate) {
 // --------------------
 // 新UI: フィルタ & ページング
 // --------------------
-function applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo }) {
+function applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, ownerFilter, fieldFilter, taskFilter }) {
   const filtered = cards.filter(c => {
     const d = (c.dataset.date || '').trim();
     const task = (c.dataset.task || '').trim();
+    const taskId = (c.dataset.taskId || '').trim();
     const owner = (c.dataset.owner || '').trim();
+    const ownerId = (c.dataset.ownerId || '').trim();
     const field = (c.dataset.field || '').trim();
+    const fieldId = (c.dataset.fieldId || '').trim();
     const text = (c.dataset.text || '').toLowerCase();
 
     if (state.selectedDate && d !== state.selectedDate) return false;
-    if (state.task && task !== state.task) return false;
-    if (state.owner && owner !== state.owner) return false;
-    if (state.field && field !== state.field) return false;
+    if (state.task && taskId !== state.task && task !== state.task) return false;
+    if (state.owner && ownerId !== state.owner && owner !== state.owner) return false;
+    if (state.field && fieldId !== state.field && field !== state.field) return false;
     if (state.search) {
       const q = state.search.toLowerCase();
       if (!text.includes(q)) return false;
@@ -873,9 +1083,12 @@ function applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, he
   }
   if (headerMeta) {
     const parts = [];
-    if (state.owner) parts.push(`オーナー：${state.owner}`);
-    if (state.field) parts.push(`圃場：${state.field}`);
-    if (state.task) parts.push(`作業：${state.task}`);
+    const ownerLabel = getSelectedLabel(ownerFilter) || state.owner;
+    const fieldLabel = getSelectedLabel(fieldFilter) || state.field;
+    const taskLabel = getSelectedLabel(taskFilter) || state.task;
+    if (state.owner) parts.push(`オーナー：${ownerLabel}`);
+    if (state.field) parts.push(`圃場：${fieldLabel}`);
+    if (state.task) parts.push(`作業：${taskLabel}`);
     if (state.search) parts.push(`検索：「${state.search}」`);
     headerMeta.textContent = parts.length ? `${parts.join(' / ')}（${total}件）` : `今日を含む最近の作業が新しい順に表示されます。（${total}件）`;
   }
@@ -901,21 +1114,60 @@ function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter
 // GraphQL -> 新UIの簡易カード
 // --------------------
 function toReportCardHtml(r) {
-  const date = escapeHtml(r.workDate ?? r.reportDate ?? r.date ?? '');
-  const task = escapeHtml(r.reportType ?? r.workType ?? '日報');
-  const fieldName = escapeHtml(r.field?.fieldName ?? r.field?.name ?? '');
-  const userName = (r.user?.firstName || r.user?.lastName)
-    ? `${r.user?.firstName ?? ''} ${r.user?.lastName ?? ''}`.trim()
-    : (r.user?.email ?? '');
-  const ownerName = escapeHtml(userName);
-  const text = escapeHtml([task, fieldName, ownerName].filter(Boolean).join(' '));
+  const data = normalizeReport(r);
+  const date = escapeHtml(data.date);
+  const task = escapeHtml(data.task);
+  const fieldName = escapeHtml(data.field);
+  const ownerName = escapeHtml(data.owner);
+  const title = escapeHtml(data.title || defaultTitleForTask(data.task, data.field));
+  const weatherName = escapeHtml(data.weatherName || '—');
+  const timeBadge = data.time ? `🕒 ${escapeHtml(data.time)}` : '🕒 —';
+  const imageUrl = escapeHtml(data.imageURL || '/img/agri-login-bg.png');
+  const text = escapeHtml(data.text || [data.task, data.field, data.owner, data.memo].filter(Boolean).join(' '));
+  const cropItemName = escapeHtml(data.cropItemName || '');
+  const cropVarietyName = escapeHtml(data.cropVarietyName || '');
+  const memo = escapeHtml(data.memo || '');
 
   return `
-    <article class="report-card" data-report data-date="${date}" data-task="${task}" data-owner="${ownerName}" data-field="${fieldName}" data-text="${text}">
+    <article class="report-card"
+      data-report
+      data-id="${escapeHtml(data.id)}"
+      data-report-id="${escapeHtml(data.id)}"
+      data-date="${date}"
+      data-task="${task}"
+      data-task-id="${escapeHtml(data.taskId)}"
+      data-owner="${ownerName}"
+      data-owner-id="${escapeHtml(data.ownerId)}"
+      data-field="${fieldName}"
+      data-field-id="${escapeHtml(data.fieldId)}"
+      data-title="${title}"
+      data-memo="${memo}"
+      data-time="${escapeHtml(data.time)}"
+      data-crop-item-id="${escapeHtml(data.cropItemId)}"
+      data-crop-item-name="${cropItemName}"
+      data-crop-variety-id="${escapeHtml(data.cropVarietyId)}"
+      data-crop-variety-name="${cropVarietyName}"
+      data-weather-code="${escapeHtml(data.weatherCode)}"
+      data-weather-name="${weatherName}"
+      data-image-url="${imageUrl}"
+      data-text="${text}">
+      <div class="report-thumb">
+        <img src="${imageUrl}" alt="${task || '作業'}の様子" onerror="this.onerror=null;this.src='/img/agri-login-bg.png';">
+      </div>
       <div class="report-content">
-        <div class="report-meta">${date}${fieldName ? `・${fieldName}` : ''}${ownerName ? `／${ownerName}` : ''}</div>
-        <div class="report-title">${task}</div>
-        <div class="report-tags"><span class="report-tag">${task}</span></div>
+        <div class="report-meta">${escapeHtml(toJaMetaLine(data.date, data.field, data.owner))}</div>
+        <div class="report-title">${title}</div>
+        <div class="report-tags">${task ? `<span class="report-tag">${task}</span>` : '<span class="report-tag">—</span>'}</div>
+        <div class="report-footer">
+          <div class="report-footer-left">
+            <span class="badge-weather">⛅ ${weatherName}</span>
+            <span class="badge-worker">👨‍🌾 ${ownerName || '—'}</span>
+          </div>
+          <div class="report-footer-right">
+            <span class="badge-time">${timeBadge}</span>
+            <span class="badge-updated">作付：${cropVarietyName || cropItemName || '—'}</span>
+          </div>
+        </div>
       </div>
     </article>
   `;

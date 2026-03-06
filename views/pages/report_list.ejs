@@ -145,7 +145,7 @@
                   <select id="field-filter">
                     <option value="">すべての圃場</option>
                     <% ((user && user.fields) ? user.fields : []).forEach((f) => { %>
-                      <option value="<%= f.name %>"><%= f.name %></option>
+                      <option value="<%= f.id %>" data-label="<%= f.name %>"><%= f.name %></option>
                     <% }) %>
                   </select>
                 </div>
@@ -153,7 +153,7 @@
                   <select id="task-filter">
                     <option value="">すべての作業</option>
                     <% (workTypes || []).slice().sort((a,b) => Number(a.id) - Number(b.id)).forEach((t) => { %>
-                      <option value="<%= t.name %>"><%= t.name %></option>
+                      <option value="<%= t.id %>" data-label="<%= t.name %>"><%= t.name %></option>
                     <% }) %>
                   </select>
                 </div>
@@ -308,8 +308,9 @@
     <div class="modal-body">
       <div>
         <div class="detail-section-title">作業の様子</div>
-        <div class="detail-image-wrapper">
-          <img id="new-image" src="/img/agri-login-bg.png" alt="作業画像（新規）">
+        <div class="detail-image-wrapper detail-image-wrapper--optional is-empty" id="new-image-wrapper">
+          <img id="new-image" alt="作業画像（新規）" hidden>
+          <div class="detail-image-placeholder" id="new-image-placeholder">画像は未選択です</div>
         </div>
         <div class="detail-note">
           <label class="detail-label" for="new-note-text">作業内容</label>
@@ -321,6 +322,16 @@
         <div class="detail-section-title">日報情報</div>
         <form id="report-create-form">
           <div class="detail-grid">
+            <div class="detail-form-group">
+              <label class="detail-label" for="new-field">圃場</label>
+              <select id="new-field" class="detail-select" name="field_id">
+                <option value="" <%= ((user && user.fields) ? user.fields : []).length !== 1 ? 'selected' : '' %>>選択してください</option>
+                <% ((user && user.fields) ? user.fields : []).forEach((f) => { %>
+                  <option value="<%= f.id %>" <%= ((user && user.fields) ? user.fields : []).length === 1 ? 'selected' : '' %>><%= f.name %></option>
+                <% }) %>
+              </select>
+            </div>
+
             <div class="detail-form-group">
               <label class="detail-label" for="new-date">日付</label>
               <input id="new-date" class="detail-input" type="date" name="date" required>
@@ -357,16 +368,6 @@
               <label class="detail-label" for="new-owner">担当者</label>
               <input id="new-owner" class="detail-input" type="text" value="<%= user ? `${user.last_name || ''} ${user.first_name || ''}`.trim() : '' %>" disabled>
               <input type="hidden" id="new-owner-id" name="owner_id" value="<%= user ? user.id : '' %>">
-            </div>
-
-            <div class="detail-form-group">
-              <label class="detail-label" for="new-field">圃場</label>
-              <select id="new-field" class="detail-select" name="field_id">
-                <option value="">選択してください</option>
-                <% ((user && user.fields) ? user.fields : []).forEach((f) => { %>
-                  <option value="<%= f.id %>"><%= f.name %></option>
-                <% }) %>
-              </select>
             </div>
 
             <div class="detail-form-group">
@@ -426,8 +427,9 @@
     <div class="modal-body">
       <div>
         <div class="detail-section-title">作業の様子</div>
-        <div class="detail-image-wrapper">
-          <img id="edit-image" src="/img/agri-login-bg.png" alt="作業画像（編集）">
+        <div class="detail-image-wrapper detail-image-wrapper--optional is-empty" id="edit-image-wrapper">
+          <img id="edit-image" alt="作業画像（編集）" hidden>
+          <div class="detail-image-placeholder" id="edit-image-placeholder">画像は未選択です</div>
         </div>
         <div class="detail-note">
           <label class="detail-label" for="edit-note-text">作業内容</label>
@@ -440,6 +442,16 @@
         <form id="report-edit-form">
           <input type="hidden" id="edit-target-id" name="targetId">
           <div class="detail-grid">
+            <div class="detail-form-group">
+              <label class="detail-label" for="edit-field">圃場</label>
+              <select id="edit-field" class="detail-select" name="field_id">
+                <option value="">選択してください</option>
+                <% ((user && user.fields) ? user.fields : []).forEach((f) => { %>
+                  <option value="<%= f.id %>"><%= f.name %></option>
+                <% }) %>
+              </select>
+            </div>
+
             <div class="detail-form-group">
               <label class="detail-label" for="edit-date">日付</label>
               <input id="edit-date" class="detail-input" type="date" name="date" required>
@@ -476,16 +488,6 @@
               <label class="detail-label" for="edit-owner">担当者</label>
               <input id="edit-owner" class="detail-input" type="text" value="<%= user ? `${user.last_name || ''} ${user.first_name || ''}`.trim() : '' %>" disabled>
               <input type="hidden" id="edit-owner-id" name="owner_id" value="<%= user ? user.id : '' %>">
-            </div>
-
-            <div class="detail-form-group">
-              <label class="detail-label" for="edit-field">圃場</label>
-              <select id="edit-field" class="detail-select" name="field_id">
-                <option value="">選択してください</option>
-                <% ((user && user.fields) ? user.fields : []).forEach((f) => { %>
-                  <option value="<%= f.id %>"><%= f.name %></option>
-                <% }) %>
-              </select>
             </div>
 
             <div class="detail-form-group">
