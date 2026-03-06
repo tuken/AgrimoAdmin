@@ -13,7 +13,7 @@
 
       <div class="form-group">
         <label class="form-label">組織名（法人/屋号）</label>
-        <input type="text" class="form-input" value="${((u.farm_name || u.name || '個人（未所属）')).replace(/"/g, '&quot;')}">
+        <div class="form-value">${((u.farm_name || u.name || '個人（未所属）')).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
       </div>
 
       <div class="form-row">
