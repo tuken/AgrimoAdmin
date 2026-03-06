@@ -18,6 +18,45 @@ query ci {
 }
 `;
 
+const CROP_VARIETIES_QUERY = `
+query cv($itemID: ID!) {
+  cropVarieties(itemID: $itemID) {
+    id
+    name
+    sortOrder
+  }
+}
+`;
+
+
+router.get('/api/crop-varieties', async (req, res) => {
+  const endpoint = process.env.GRAPHQL_ENDPOINT;
+  const itemID = String(req.query.itemID || '').trim();
+
+  if (!itemID) return res.json({ ok: true, items: [] });
+  if (!endpoint) return res.status(500).json({ ok: false, items: [], message: 'GRAPHQL_ENDPOINT is not set' });
+
+  try {
+    const r = await callUpstreamGraphQL({
+      endpoint,
+      query: CROP_VARIETIES_QUERY,
+      variables: { itemID },
+    });
+
+    if (r?.json?.errors?.length) {
+      console.error('[report] cropVarieties errors:', r.json.errors);
+      return res.status(502).json({ ok: false, items: [], errors: r.json.errors });
+    }
+
+    const list = Array.isArray(r?.json?.data?.cropVarieties) ? r.json.data.cropVarieties : [];
+    list.sort((a, b) => Number(a?.sortOrder ?? 0) - Number(b?.sortOrder ?? 0) || Number(a?.id ?? 0) - Number(b?.id ?? 0));
+    return res.json({ ok: true, items: list });
+  } catch (e) {
+    console.error('[report] cropVarieties fetch failed:', e);
+    return res.status(500).json({ ok: false, items: [], message: 'Failed to fetch crop varieties' });
+  }
+});
+
 router.get('/report_list', async (req, res) => {
   const endpoint = process.env.GRAPHQL_ENDPOINT;
 

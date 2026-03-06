@@ -76,6 +76,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const createForm = document.querySelector('#report-create-form');
   const editForm = document.querySelector('#report-edit-form');
+  const createSaveBtn = document.querySelector('#new-save');
+  const editSaveBtn = document.querySelector('#edit-save');
 
   const createMsg = document.querySelector('#new-message');
   const editMsg = document.querySelector('#edit-message');
@@ -93,6 +95,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireModal(createModal);
   wireModal(detailModal);
   wireModal(editModal);
+  wireCropVarietyDynamic(createForm);
+  wireCropVarietyDynamic(editForm);
 
   // ESCで閉じる
   document.addEventListener('keydown', function (e) {
@@ -266,7 +270,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       const d = currentSelectedDateOrToday(state);
       const dateInput = createForm.querySelector('#new-date');
       if (dateInput) dateInput.value = d;
+      syncCropVarietySelect(createForm, '', { id: '', name: '' });
       openModal(createModal);
+    });
+  }
+
+  if (createSaveBtn && createForm) {
+    createSaveBtn.addEventListener('click', function () {
+      if (typeof createForm.requestSubmit === 'function') createForm.requestSubmit();
+      else createForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    });
+  }
+
+  if (editSaveBtn && editForm) {
+    editSaveBtn.addEventListener('click', function () {
+      if (typeof editForm.requestSubmit === 'function') editForm.requestSubmit();
+      else editForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
     });
   }
 
@@ -422,10 +441,12 @@ function normalizeFormData(fd, formEl) {
   // optional masters (kept for future)
   const cropItemId = (fd.get('crop_item_id') || '').toString().trim();
   const cropItemName = getSelectedText(formEl?.querySelector('[name="crop_item_id"]')) || '';
+  const cropVarietyId = (fd.get('crop_variety_id') || '').toString().trim();
+  const cropVarietyName = getSelectedText(formEl?.querySelector('[name="crop_variety_id"]')) || '';
   const weatherCode = (fd.get('weather') || '').toString().trim();
 
   const time = (timeStart || timeEnd) ? `${timeStart || '—'}〜${timeEnd || '—'}` : '';
-  const text = [taskName, cropItemName, title, fieldName, owner, memo].filter(Boolean).join(' ');
+  const text = [taskName, cropItemName, cropVarietyName, title, fieldName, owner, memo].filter(Boolean).join(' ');
 
   return {
     date,
@@ -442,6 +463,8 @@ function normalizeFormData(fd, formEl) {
     memo,
     cropItemId,
     cropItemName,
+    cropVarietyId,
+    cropVarietyName,
     weatherCode,
     text
   };
@@ -455,10 +478,14 @@ function readCardData(card) {
   const field = ds.field || '';
   const title = ds.title || qs('.report-title', card)?.textContent?.trim() || '';
   const memo = ds.memo || '';
+  const cropItemId = ds.cropItemId || '';
+  const cropItemName = ds.cropItemName || '';
+  const cropVarietyId = ds.cropVarietyId || '';
+  const cropVarietyName = ds.cropVarietyName || '';
   const time = ds.time || qs('.badge-time', card)?.textContent?.replace('🕒', '')?.trim() || '';
-  const text = ds.text || [task, title, field, owner, memo].filter(Boolean).join(' ');
+  const text = ds.text || [task, cropItemName, cropVarietyName, title, field, owner, memo].filter(Boolean).join(' ');
   const id = ds.reportId || ds.id || '';
-  return { id, date, task, owner, field, title, memo, time, text };
+  return { id, date, task, owner, field, title, memo, time, text, cropItemId, cropItemName, cropVarietyId, cropVarietyName };
 }
 
 function fillDetailModal(data) {
@@ -480,6 +507,87 @@ function fillDetailModal(data) {
   if (detailMemo) detailMemo.textContent = data.memo || '—';
 }
 
+
+async function fetchCropVarieties(itemID) {
+  const id = String(itemID || '').trim();
+  if (!id) return [];
+  try {
+    const res = await fetch(`/api/crop-varieties?itemID=${encodeURIComponent(id)}`, {
+      headers: { 'accept': 'application/json' },
+      credentials: 'same-origin'
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.ok || !Array.isArray(json?.items)) return [];
+    return json.items;
+  } catch (e) {
+    console.error('[report] fetchCropVarieties failed:', e);
+    return [];
+  }
+}
+
+function fillCropVarietyOptions(selectEl, items, selectedValue, selectedText) {
+  if (!selectEl) return;
+  const list = Array.isArray(items) ? items : [];
+  const currentValue = String(selectedValue || '').trim();
+  const currentText = String(selectedText || '').trim();
+
+  selectEl.innerHTML = '';
+
+  if (!list.length) {
+    selectEl.disabled = true;
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = currentValue || currentText ? '該当する品種がありません' : '作付品目を選択してください';
+    selectEl.appendChild(opt);
+    return;
+  }
+
+  selectEl.disabled = false;
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '選択してください';
+  selectEl.appendChild(placeholder);
+
+  list.forEach(function (item) {
+    const opt = document.createElement('option');
+    opt.value = item?.id != null ? String(item.id) : '';
+    opt.textContent = (item?.name || '').toString();
+    selectEl.appendChild(opt);
+  });
+
+  if (currentValue) {
+    selectEl.value = currentValue;
+  }
+  if (!selectEl.value && currentText) {
+    setSelectByText(selectEl, currentText);
+  }
+}
+
+async function syncCropVarietySelect(formEl, itemID, selectedVariety) {
+  if (!formEl) return;
+  const varietySel = qs('[name="crop_variety_id"]', formEl);
+  if (!varietySel) return;
+
+  const id = String(itemID || '').trim();
+  if (!id) {
+    fillCropVarietyOptions(varietySel, [], '', '');
+    return;
+  }
+
+  const items = await fetchCropVarieties(id);
+  fillCropVarietyOptions(varietySel, items, selectedVariety?.id, selectedVariety?.name);
+}
+
+function wireCropVarietyDynamic(formEl) {
+  if (!formEl) return;
+  const itemSel = qs('[name="crop_item_id"]', formEl);
+  if (!itemSel || itemSel.dataset.cropVarietyWired === '1') return;
+  itemSel.dataset.cropVarietyWired = '1';
+  itemSel.addEventListener('change', function () {
+    syncCropVarietySelect(formEl, itemSel.value, { id: '', name: '' });
+  });
+}
+
 function fillEditForm(data) {
   const editForm = qs('#report-edit-form');
   if (!editForm) return;
@@ -490,6 +598,12 @@ function fillEditForm(data) {
   if (taskSel) {
     taskSel.value = '';
     setSelectByText(taskSel, data.task || '');
+  }
+  const cropItemSel = qs('#edit-crop-item', editForm);
+  if (cropItemSel) {
+    cropItemSel.value = data.cropItemId || '';
+    if (!cropItemSel.value && data.cropItemName) setSelectByText(cropItemSel, data.cropItemName);
+    syncCropVarietySelect(editForm, cropItemSel.value, { id: data.cropVarietyId || '', name: data.cropVarietyName || '' });
   }
   qs('#edit-owner', editForm).value = data.owner || '';
   const fieldSel = qs('#edit-field', editForm);
@@ -520,6 +634,10 @@ function buildReportCardElement(data) {
   el.dataset.title = data.title || '';
   el.dataset.memo = data.memo || '';
   el.dataset.time = data.time || '';
+  el.dataset.cropItemId = data.cropItemId || '';
+  el.dataset.cropItemName = data.cropItemName || '';
+  el.dataset.cropVarietyId = data.cropVarietyId || '';
+  el.dataset.cropVarietyName = data.cropVarietyName || '';
   el.dataset.text = data.text || '';
 
   const meta = toJaMetaLine(data.date, data.field, data.owner);
@@ -559,6 +677,10 @@ function applyCardUpdate(card, data) {
   card.dataset.title = data.title || '';
   card.dataset.memo = data.memo || '';
   card.dataset.time = data.time || '';
+  card.dataset.cropItemId = data.cropItemId || '';
+  card.dataset.cropItemName = data.cropItemName || '';
+  card.dataset.cropVarietyId = data.cropVarietyId || '';
+  card.dataset.cropVarietyName = data.cropVarietyName || '';
   card.dataset.text = data.text || '';
 
   const meta = toJaMetaLine(data.date, data.field, data.owner);

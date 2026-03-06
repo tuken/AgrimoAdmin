@@ -347,6 +347,13 @@
             </div>
 
             <div class="detail-form-group">
+              <label class="detail-label" for="new-crop-variety">品種</label>
+              <select id="new-crop-variety" class="detail-select" name="crop_variety_id" disabled>
+                <option value="">作付品目を選択してください</option>
+              </select>
+            </div>
+
+            <div class="detail-form-group">
               <label class="detail-label" for="new-owner">担当者</label>
               <input id="new-owner" class="detail-input" type="text" value="<%= user ? `${user.last_name || ''} ${user.first_name || ''}`.trim() : '' %>" disabled>
               <input type="hidden" id="new-owner-id" name="owner_id" value="<%= user ? user.id : '' %>">
@@ -455,6 +462,13 @@
                 <% (cropItems || []).slice().sort((a,b) => Number(a.id) - Number(b.id)).forEach((c) => { %>
                   <option value="<%= c.id %>"><%= c.name %></option>
                 <% }) %>
+              </select>
+            </div>
+
+            <div class="detail-form-group">
+              <label class="detail-label" for="edit-crop-variety">品種</label>
+              <select id="edit-crop-variety" class="detail-select" name="crop_variety_id" disabled>
+                <option value="">作付品目を選択してください</option>
               </select>
             </div>
 

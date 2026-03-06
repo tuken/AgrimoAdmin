@@ -1118,3 +1118,29 @@
   width: 60px;
   height: 60px;
 }
+
+
+/* report modal mobile: prevent horizontal drift */
+.modal-backdrop,
+.modal-backdrop .modal,
+.modal-backdrop .modal-body {
+  overflow-x: hidden;
+}
+
+.detail-input,
+.detail-select,
+.detail-note textarea,
+.detail-image-wrapper img {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+@media (max-width: 780px) {
+  .modal-backdrop .modal {
+    width: min(100%, 100vw - 24px);
+  }
+
+  .detail-image-wrapper {
+    width: 100%;
+  }
+}
