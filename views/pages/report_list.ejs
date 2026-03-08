@@ -196,8 +196,12 @@
     <div class="modal-body">
       <div>
         <div class="detail-section-title">作業の様子</div>
-        <div class="detail-image-wrapper">
-          <img id="detail-image" src="/img/agri-login-bg.png" alt="作業画像（詳細）">
+        <div class="detail-image-wrapper detail-image-wrapper--optional is-empty" id="detail-image-wrapper">
+          <img id="detail-image" alt="作業画像（詳細）" hidden>
+          <div class="detail-image-placeholder" id="detail-image-placeholder">
+            <div class="detail-image-placeholder-icon">🌾</div>
+            <div class="detail-image-placeholder-text">作業画像は未登録です</div>
+          </div>
         </div>
         <div class="detail-note">
           <label class="detail-label" for="detail-note-text">作業内容</label>
@@ -322,7 +326,7 @@
         <div class="detail-section-title">作業の様子</div>
         <div class="detail-image-wrapper detail-image-wrapper--optional is-empty" id="new-image-wrapper">
           <img id="new-image" alt="作業画像（新規）" hidden>
-          <div class="detail-image-placeholder" id="new-image-placeholder">画像は未選択です</div>
+          <div class="detail-image-placeholder" id="new-image-placeholder"><div class="detail-image-placeholder-icon">🌾</div><div class="detail-image-placeholder-text">画像は未選択です</div></div>
         </div>
         <div class="detail-note">
           <label class="detail-label" for="new-note-text">作業内容</label>
@@ -441,7 +445,7 @@
         <div class="detail-section-title">作業の様子</div>
         <div class="detail-image-wrapper detail-image-wrapper--optional is-empty" id="edit-image-wrapper">
           <img id="edit-image" alt="作業画像（編集）" hidden>
-          <div class="detail-image-placeholder" id="edit-image-placeholder">画像は未選択です</div>
+          <div class="detail-image-placeholder" id="edit-image-placeholder"><div class="detail-image-placeholder-icon">🌾</div><div class="detail-image-placeholder-text">画像は未選択です</div></div>
         </div>
         <div class="detail-note">
           <label class="detail-label" for="edit-note-text">作業内容</label>

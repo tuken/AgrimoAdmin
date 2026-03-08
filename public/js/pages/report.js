@@ -687,18 +687,7 @@ function fillDetailModal(data) {
   if (detailHours) detailHours.value = data.hours || '';
   if (detailUpdatedAt) detailUpdatedAt.value = data.updatedAt || '—';
   if (detailNote) detailNote.value = data.memo || '';
-  if (detailImage) {
-    const fullSrc = String(data.imageUrl || '').trim();
-    const hasImage = !!fullSrc;
-    detailImage.src = hasImage ? fullSrc : '/img/agri-login-bg.png';
-    detailImage.dataset.fullSrc = fullSrc;
-    detailImage.style.cursor = hasImage ? 'zoom-in' : 'default';
-    const wrapper = detailImage.closest('.detail-image-wrapper');
-    if (wrapper) {
-      wrapper.classList.toggle('is-clickable', hasImage);
-      wrapper.setAttribute('title', hasImage ? 'クリックで拡大表示' : '');
-    }
-  }
+  setDetailImageState(data.imageUrl);
   if (detailMetaFooter) {
     const parts = [formatDateJa(data.date) || '', data.field || '', data.owner || ''].filter(Boolean);
     detailMetaFooter.textContent = parts.join(' ／ ');
@@ -844,6 +833,54 @@ async function fillEditForm(data) {
   }
 }
 
+function buildReportThumbMarkup(imageUrl, altText) {
+  const src = String(imageUrl || '').trim();
+  if (src) {
+    return {
+      empty: false,
+      html: `<img src="${escapeHtml(src)}" alt="${escapeHtml(altText || '作業画像')}">`,
+    };
+  }
+  return {
+    empty: true,
+    html: `
+      <div class="report-thumb-placeholder" aria-label="画像未登録">
+        <div class="report-thumb-placeholder-icon">🌾</div>
+        <div class="report-thumb-placeholder-text">画像なし</div>
+      </div>
+    `,
+  };
+}
+
+function setDetailImageState(imageUrl) {
+  const detailImage = qs('#detail-image');
+  if (!detailImage) return;
+  const wrapper = detailImage.closest('.detail-image-wrapper');
+  const placeholder = qs('#detail-image-placeholder');
+  const fullSrc = String(imageUrl || '').trim();
+  const hasImage = !!fullSrc;
+
+  if (hasImage) {
+    detailImage.src = fullSrc;
+    detailImage.hidden = false;
+    detailImage.dataset.fullSrc = fullSrc;
+    detailImage.style.cursor = 'zoom-in';
+    if (placeholder) placeholder.hidden = true;
+  } else {
+    detailImage.removeAttribute('src');
+    detailImage.hidden = true;
+    detailImage.dataset.fullSrc = '';
+    detailImage.style.cursor = 'default';
+    if (placeholder) placeholder.hidden = false;
+  }
+
+  if (wrapper) {
+    wrapper.classList.toggle('is-empty', !hasImage);
+    wrapper.classList.toggle('is-clickable', hasImage);
+    wrapper.setAttribute('title', hasImage ? 'クリックで拡大表示' : '');
+  }
+}
+
 function buildReportCardElement(data) {
   const el = document.createElement('article');
   el.className = 'report-card';
@@ -878,10 +915,10 @@ function buildReportCardElement(data) {
   const tag = data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '';
   const hoursBadge = buildHoursBadge(data.hours);
   const weatherBadge = escapeHtml(buildWeatherBadge(data.weatherCode, data.weatherName));
-  const thumb = data.imageUrl ? `<img src="${escapeHtml(data.imageUrl)}" alt="${escapeHtml(data.task || '作業')}の様子">` : '';
+  const thumb = buildReportThumbMarkup(data.imageUrl, `${data.task || '作業'}の様子`);
 
   el.innerHTML = `
-    <div class="report-thumb">${thumb}</div>
+    <div class="report-thumb${thumb.empty ? ' is-empty' : ''}">${thumb.html}</div>
     <div class="report-content">
       <div class="report-meta">${escapeHtml(meta)}</div>
       <div class="report-title">${escapeHtml(title)}</div>
@@ -1009,7 +1046,6 @@ async function fetchReports(listRoot, viewYear, viewMonth) {
             firstName
             lastName
             email
-            farmName
           }
           field {
             id
@@ -1047,7 +1083,6 @@ async function fetchReports(listRoot, viewYear, viewMonth) {
             firstName
             lastName
             email
-            farmName
           }
           field {
             id
@@ -1079,12 +1114,19 @@ async function fetchReports(listRoot, viewYear, viewMonth) {
   let lastError = null;
   for (const q of queries) {
     const result = await window.gql(q, variables);
+    const reports = Array.isArray(result.data?.findWorkReportsWithUserID)
+      ? result.data.findWorkReportsWithUserID
+      : [];
+
     if (!result.errors) {
-      const reports = Array.isArray(result.data?.findWorkReportsWithUserID)
-        ? result.data.findWorkReportsWithUserID
-        : [];
       return await enrichReportsWithCropItem(reports);
     }
+
+    if (reports.length) {
+      console.warn('[report] fetchReports using partial data with GraphQL warnings:', result.errors);
+      return await enrichReportsWithCropItem(reports);
+    }
+
     lastError = result.errors[0]?.message || 'GraphQL error';
     console.warn('[report] fetchReports retry with fallback query:', result.errors);
   }
@@ -1596,10 +1638,11 @@ function toReportCardHtml(r) {
   const title = escapeHtml(memoRaw ? memoRaw.split(/\r?\n/)[0].trim().slice(0, 60) : defaultTitleForTask(taskName, fieldRawName));
   const weatherBadge = escapeHtml(buildWeatherBadge(weatherCode, weatherNameRaw));
   const hoursBadge = buildHoursBadge(hoursRaw);
+  const thumb = buildReportThumbMarkup(imageUrlRaw, `${taskName || '作業'}の様子`);
 
   return `
     <article class="report-card" data-report data-report-id="${escapeHtml(String(r.id ?? ''))}" data-date="${date}" data-task="${task}" data-task-id="${taskId}" data-owner="${ownerName}" data-owner-id="${ownerId}" data-field="${fieldName}" data-field-id="${fieldId}" data-memo="${memo}" data-crop-item-id="${cropItemId}" data-crop-item-name="${cropItemName}" data-crop-variety-id="${cropVarietyId}" data-crop-variety-name="${cropVarietyName}" data-weather-code="${weatherCode}" data-weather-name="${weatherName}" data-hours="${hours}" data-time="${hoursRaw ? `${hoursRaw}h` : ''}" data-image-url="${imageUrl}" data-updated-at="${updatedAt}" data-text="${text}">
-      <div class="report-thumb">${imageUrlRaw ? `<img src="${imageUrl}" alt="${task}の様子">` : ''}</div>
+      <div class="report-thumb${thumb.empty ? ' is-empty' : ''}">${thumb.html}</div>
       <div class="report-content">
         <div class="report-meta">${escapeHtml(toJaMetaLine(workDate, fieldRawName, userNameRaw))}</div>
         <div class="report-title">${title}</div>
