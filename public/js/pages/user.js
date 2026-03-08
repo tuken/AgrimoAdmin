@@ -25,15 +25,49 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
+  let bodyScrollLockY = 0;
+
+  function lockBodyScroll() {
+    bodyScrollLockY = window.scrollY || window.pageYOffset || 0;
+    document.documentElement.classList.add('modal-open');
+    document.body.classList.add('modal-open-body-lock');
+    document.body.style.top = `-${bodyScrollLockY}px`;
+  }
+
+  function unlockBodyScroll() {
+    const y = bodyScrollLockY;
+    document.body.classList.remove('modal-open-body-lock');
+    document.body.style.top = '';
+    document.documentElement.classList.remove('modal-open');
+    window.scrollTo(0, y);
+  }
+
+  function syncModalOpenState() {
+    const hasOpenModal = document.querySelector('.modal-backdrop.open');
+    if (hasOpenModal) {
+      if (!document.body.classList.contains('modal-open-body-lock')) {
+        lockBodyScroll();
+      } else {
+        document.documentElement.classList.add('modal-open');
+      }
+    } else if (document.body.classList.contains('modal-open-body-lock')) {
+      unlockBodyScroll();
+    } else {
+      document.documentElement.classList.remove('modal-open');
+    }
+  }
+
   function openBackdrop(backdrop) {
     if (!backdrop) return;
     backdrop.classList.add('open');
     backdrop.setAttribute('aria-hidden', 'false');
+    syncModalOpenState();
   }
   function closeBackdrop(backdrop) {
     if (!backdrop) return;
     backdrop.classList.remove('open');
     backdrop.setAttribute('aria-hidden', 'true');
+    syncModalOpenState();
   }
   function bindBackdropClose(backdrop, closeFn) {
     if (!backdrop) return;
@@ -160,6 +194,10 @@ document.addEventListener('DOMContentLoaded', () => {
           createdAt
           parent {
             id
+            farmName
+            lastName
+            firstName
+            email
           }
           fields {
             id
@@ -195,9 +233,17 @@ document.addEventListener('DOMContentLoaded', () => {
     (Array.isArray(users) ? users : []).forEach((user) => {
       const fields = Array.isArray(user?.fields) ? user.fields.map((f) => ({ id: String(f?.id || '').trim(), name: String(f?.name || '').trim() })).filter((f) => f.name) : [];
       const isOwner = !String(user?.parent?.id || '').trim();
+      if (isOwnerUser && isOwner) return;
+
+      const ownerDisplayName = `${String(user?.parent?.lastName || '').trim()} ${String(user?.parent?.firstName || '').trim()}`.trim()
+        || String(user?.parent?.email || '').trim();
+      const displayFarmName = isOwner
+        ? String(user?.farmName || '').trim()
+        : String(user?.parent?.farmName || '').trim() || String(user?.farmName || '').trim() || ownerDisplayName;
+
       buildWorkerCard({
         id: String(user?.id || '').trim(),
-        farmName: String(user?.farmName || '').trim(),
+        farmName: displayFarmName,
         name: getDisplayName(user),
         lastName: String(user?.lastName || '').trim(),
         firstName: String(user?.firstName || '').trim(),
@@ -655,6 +701,10 @@ document.addEventListener('DOMContentLoaded', () => {
           lastLoginAt
           parent {
             id
+            farmName
+            lastName
+            firstName
+            email
           }
           fields {
             id

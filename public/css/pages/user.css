@@ -1288,3 +1288,295 @@
   width: 60px;
   height: 60px;
 }
+
+
+/* ===== Mobile modal improvements for user detail/create/edit ===== */
+.modal-backdrop {
+  align-items: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px;
+}
+
+.modal-backdrop .modal {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+}
+
+.modal-backdrop .modal-header,
+.modal-backdrop .detail-footer {
+  flex: 0 0 auto;
+}
+
+.modal-backdrop .modal-body {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.detail-grid {
+  align-items: start;
+}
+
+.detail-form-group,
+.detail-grid > * {
+  min-width: 0;
+}
+
+.detail-input,
+.detail-select,
+.detail-textarea {
+  max-width: 100%;
+}
+
+@media (max-width: 780px) {
+  .modal-backdrop {
+    padding: 8px;
+  }
+
+  .modal-backdrop .modal {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 16px);
+    border-radius: 14px;
+  }
+
+  .modal-backdrop .modal-header {
+    padding: 12px 14px;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .modal-backdrop .modal-title {
+    font-size: 0.96rem;
+    line-height: 1.4;
+  }
+
+  .modal-backdrop .modal-subtitle {
+    line-height: 1.4;
+  }
+
+  .modal-backdrop .modal-body {
+    padding: 12px 14px 14px;
+  }
+
+  .detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .detail-form-group {
+    margin-bottom: 0;
+  }
+
+  .detail-label {
+    margin-bottom: 4px;
+  }
+
+  .detail-input,
+  .detail-select,
+  .detail-textarea {
+    padding: 10px 12px;
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  .detail-help {
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  .detail-footer {
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .detail-footer-left,
+  .detail-footer-right {
+    width: 100%;
+  }
+
+  .detail-footer-right {
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .detail-footer-right .btn-primary,
+  .detail-footer-right .btn-secondary,
+  .detail-footer-right .btn-danger {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+  }
+
+  .field-selector-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .field-selector-row .btn-secondary.small,
+  .field-selector-row .btn-primary.small {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .chip-list {
+    gap: 8px;
+  }
+
+  .chip {
+    max-width: 100%;
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 420px) {
+  .modal-backdrop .modal-header,
+  .modal-backdrop .modal-body,
+  .detail-footer {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .modal-backdrop .modal-title {
+    font-size: 0.92rem;
+  }
+
+  .modal-backdrop .modal-close-btn {
+    font-size: 1.3rem;
+    line-height: 1;
+    padding: 2px 4px;
+  }
+}
+
+
+/* ===== 2026-03 mobile modal scroll containment fix ===== */
+.modal-backdrop {
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.modal-backdrop.open {
+  display: flex;
+}
+
+.modal-backdrop .modal {
+  overscroll-behavior: contain;
+}
+
+.modal-backdrop .modal-body {
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+@media (max-width: 780px) {
+  .modal-backdrop {
+    align-items: flex-start;
+  }
+
+  .modal-backdrop .modal {
+    margin: 0 auto;
+  }
+}
+
+
+/* ===== 2026-03 modal body lock + internal scroll fix ===== */
+body.modal-open-body-lock {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.modal-backdrop.open {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.modal-backdrop .modal {
+  height: auto;
+  min-height: 0;
+}
+
+.modal-backdrop .modal-body {
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+
+@media (max-width: 780px) {
+  .modal-backdrop .modal {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .modal-backdrop .modal-body {
+    max-height: none;
+  }
+}
+
+
+/* ===== 2026-03 desktop modal scroll reliability fix ===== */
+.modal-backdrop {
+  overflow: hidden;
+}
+
+.modal-backdrop .modal {
+  width: min(100%, 780px);
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+
+.modal-backdrop .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  scrollbar-gutter: stable;
+}
+
+@media (min-width: 781px) {
+  .modal-backdrop {
+    align-items: center;
+    padding: 12px;
+  }
+
+  .modal-backdrop .modal {
+    margin: 0 auto;
+    max-height: calc(100dvh - 24px);
+  }
+}
+
+/* ===== 2026-03 modal internal scroll final fix ===== */
+.modal-backdrop .modal {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  max-height: calc(100dvh - 24px);
+}
+
+.modal-backdrop .modal-body {
+  display: block;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-backdrop .detail-grid {
+  min-height: min-content;
+}
+
+@media (max-width: 780px) {
+  .modal-backdrop .modal {
+    max-height: calc(100dvh - 16px);
+  }
+}

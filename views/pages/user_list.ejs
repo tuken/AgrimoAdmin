@@ -1,3 +1,7 @@
+<%
+  const currentRoleId = user ? (user.role_id ?? user.roleId ?? user.roleID ?? user.role_type ?? user.roleType ?? '') : '';
+  const isOwnerUser = Number(currentRoleId) === 2;
+%>
 <%- include('../partials/head', { title: "ユーザー一覧", pageCss: "user", bodyClass: "" }) %>
 <%- include('../partials/header') %>
 
@@ -43,9 +47,11 @@
       <div class="report-list user-list user-sections" id="user-list" data-current-user-id="<%= user && user.id ? user.id : "" %>" data-current-role-id="<%= user ? (user.role_id ?? user.roleId ?? user.roleID ?? user.role_type ?? user.roleType ?? "") : "" %>">
 
         <!-- オーナーセクション -->
+        <% if (!isOwnerUser) { %>
         <section class="user-section" data-section="owner">
           <h2 class="user-section-heading">オーナー</h2>
         </section>
+        <% } %>
 
         <!-- 作業者セクション -->
         <section class="user-section" data-section="worker">
