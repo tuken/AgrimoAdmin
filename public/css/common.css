@@ -711,3 +711,6 @@ header.header .nav-item.active .nav-icon rect{
 .primary-button--green:hover {
   filter: brightness(0.98);
 }
+
+
+.detail-help{margin-top:6px;font-size:12px;line-height:1.5;color:#6b7280;}

@@ -16,7 +16,7 @@
 
           <div class="page-header-actions">
             <% if (isRole1) { %>
-              <button class="primary-button" id="field-create-button" type="button">
+              <button class="primary-button btn-main-green" id="field-create-button" type="button">
                 <span class="icon">＋</span>
                 <span>圃場を登録</span>
               </button>
@@ -27,9 +27,6 @@
               <div class="select-wrapper">
                 <select id="owner-filter">
                   <option value="">すべてのオーナー</option>
-                  <option value="山田農園">山田農園</option>
-                  <option value="佐藤ファーム">佐藤ファーム</option>
-                  <option value="高橋アグリサービス">高橋アグリサービス</option>
                 </select>
               </div>
             <% } %>
@@ -111,7 +108,7 @@
           <div class="map-marker" id="field-create-map-marker" aria-label="位置マーカー"></div>
         </div>
         <div class="map-coords" id="field-create-map-coords">lat: -, lng: -</div>
-        <div class="field-hint" style="margin-top:10px; font-size:12px; color:#6b7280;">※ デモ用：緯度/経度を入力すると地図が更新されます</div>
+        <div class="field-hint" style="margin-top:10px; font-size:12px; color:#6b7280;">※緯度/経度を入力すると地図が更新されます</div>
       </div>
 
       <!-- right: form -->
@@ -123,15 +120,14 @@
           <input class="detail-input" id="create-name" type="text" placeholder="例：6号圃場（北側）">
         </div>
 
-        <div class="detail-inline-row">
-          <div class="detail-form-group">
-            <label class="detail-label">コード</label>
-            <input class="detail-input" id="create-code" type="text" placeholder="例：F-006-N">
-          </div>
-          <div class="detail-form-group">
-            <label class="detail-label">面積（㎡）</label>
-            <input class="detail-input" id="create-area" type="number" step="0.01" placeholder="例：1200">
-          </div>
+        <div class="detail-form-group" style="display:none;">
+          <label class="detail-label">コード</label>
+          <input class="detail-input" id="create-code" type="text" placeholder="例：F-006-N" tabindex="-1" aria-hidden="true">
+        </div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">面積（㎡）</label>
+          <input class="detail-input" id="create-area" type="number" step="0.01" placeholder="例：1200">
         </div>
 
         <div class="detail-inline-row">
@@ -158,25 +154,24 @@
 
         <div class="detail-form-group">
           <label class="detail-label">オーナー</label>
-          <input class="detail-input" id="create-owner" type="text" placeholder="例：山田農園">
+          <select class="detail-input" id="create-owner"><option value="">選択してください</option></select>
+        </div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">郵便番号</label>
+          <input class="detail-input" id="create-postal" type="text" inputmode="numeric" autocomplete="postal-code" placeholder="例：0000001">
         </div>
 
         <div class="detail-form-group">
           <label class="detail-label">住所</label>
-          <input class="detail-input" id="create-address" type="text" placeholder="例：東京都渋谷区...">
+          <input class="detail-input" id="create-address" type="text" autocomplete="street-address" placeholder="例：東京都渋谷区...">
         </div>
 
-        <div class="detail-inline-row">
-          <div class="detail-form-group">
-            <label class="detail-label">郵便番号</label>
-            <input class="detail-input" id="create-postal" type="text" placeholder="例：150-0001">
-          </div>
-          <div class="detail-form-group">
-            <label class="detail-label">緯度 / 経度</label>
-            <div class="detail-inline-row" style="gap:8px;">
-              <input class="detail-input" id="create-lat" type="number" step="0.0000001" placeholder="lat">
-              <input class="detail-input" id="create-lng" type="number" step="0.0000001" placeholder="lng">
-            </div>
+        <div class="detail-form-group">
+          <label class="detail-label">緯度 / 経度</label>
+          <div class="detail-inline-row" style="gap:8px;">
+            <input class="detail-input" id="create-lat" type="number" step="0.0000001" placeholder="lat">
+            <input class="detail-input" id="create-lng" type="number" step="0.0000001" placeholder="lng">
           </div>
         </div>
 
@@ -192,7 +187,7 @@
         <button type="button" class="btn-secondary" id="field-create-cancel">キャンセル</button>
       </div>
       <div class="field-modal-footer-right">
-        <button type="button" class="btn-primary-sm" id="field-create-save">登録</button>
+        <button type="button" class="btn-primary-sm btn-main-green" id="field-create-save">登録</button>
       </div>
     </div>
   </div>
@@ -219,9 +214,6 @@
         </div>
         <div class="map-coords" id="field-map-coords">lat: -, lng: -</div>
 
-        <div style="height:12px"></div>
-        <div class="field-modal-section-title">作業者</div>
-        <div class="worker-chips" id="field-worker-chips"></div>
       </div>
 
       <!-- right: detail -->
@@ -234,25 +226,19 @@
           <input class="detail-input" id="detail-name" type="text" disabled>
         </div>
 
-        <div class="detail-inline-row">
-          <div class="detail-form-group">
-            <label class="detail-label">コード</label>
-            <input class="detail-input" id="detail-code" type="text" disabled>
-          </div>
-          <div class="detail-form-group">
-            <label class="detail-label">面積（㎡）</label>
-            <input class="detail-input" id="detail-area" type="number" step="0.01" disabled>
-          </div>
+        <div class="detail-form-group">
+          <label class="detail-label">面積（㎡）</label>
+          <input class="detail-input" id="detail-area" type="number" step="0.01" disabled>
         </div>
 
         <div class="detail-inline-row">
           <div class="detail-form-group">
             <label class="detail-label">種別</label>
-            <input class="detail-input" id="detail-type" type="text" disabled>
+            <select class="detail-input" id="detail-type" disabled></select>
           </div>
           <div class="detail-form-group">
             <label class="detail-label">状態</label>
-            <input class="detail-input" id="detail-status" type="text" disabled>
+            <select class="detail-input" id="detail-status" disabled></select>
           </div>
         </div>
 
@@ -262,24 +248,13 @@
         </div>
 
         <div class="detail-form-group">
-          <label class="detail-label">住所</label>
-          <input class="detail-input" id="detail-address" type="text" disabled>
-        </div>
-
-        <div class="detail-inline-row">
-          <div class="detail-form-group">
-            <label class="detail-label">郵便番号</label>
-            <input class="detail-input" id="detail-postal" type="text" disabled>
-          </div>
-          <div class="detail-form-group">
-            <label class="detail-label">更新日時</label>
-            <input class="detail-input" id="detail-updated" type="text" disabled>
-          </div>
+          <label class="detail-label">郵便番号</label>
+          <input class="detail-input" id="detail-postal" type="text" disabled>
         </div>
 
         <div class="detail-form-group">
-          <label class="detail-label">備考</label>
-          <textarea class="detail-textarea" id="detail-note" disabled></textarea>
+          <label class="detail-label">住所</label>
+          <input class="detail-input" id="detail-address" type="text" disabled>
         </div>
       </div>
     </div>
@@ -290,7 +265,7 @@
       </div>
       <div class="field-modal-footer-right">
         <button type="button" class="btn-secondary" id="field-detail-edit">編集</button>
-        <button type="button" class="btn-primary-sm" id="field-detail-save" style="display:none;">保存</button>
+        <button type="button" class="btn-primary-sm btn-main-green" id="field-detail-save" style="display:none;">保存</button>
       </div>
     </div>
   </div>

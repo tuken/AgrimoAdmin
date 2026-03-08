@@ -241,6 +241,27 @@
       text-overflow: ellipsis;
     }
 
+    .field-name-wrap {
+      min-width: 0;
+      width: 100%;
+    }
+
+    .field-name-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .field-area-inline {
+      flex: 0 0 auto;
+      font-size: 0.72rem;
+      color: var(--text-sub);
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+
     .field-code {
       font-size: 0.68rem;
       color: var(--text-sub);

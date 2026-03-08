@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const searchClear = document.querySelector('#report-search-clear');
   const ownerFilter = document.querySelector('#owner-filter');
   const fieldFilter = document.querySelector('#field-filter');
+  const isRole1 = !!ownerFilter;
   const taskFilter = document.querySelector('#task-filter');
 
   const btnPrevMonth = document.querySelector('#prev-month');
@@ -41,11 +42,37 @@ document.addEventListener('DOMContentLoaded', async () => {
   const pageInfo = document.querySelector('#page-info');
   const pagination = document.querySelector('#pagination');
 
+  if (isRole1) {
+    try {
+      await initializeRole1Filters({ ownerFilter, fieldFilter });
+    } catch (e) {
+      console.error('[report] role1 filters init failed:', e);
+    }
+  }
+
   // --------------------
-  // データソースの確保（GraphQLから当月分を取得）
+  // データソースの確保（DOMカード -> 無ければGraphQLで簡易カード生成）
   // --------------------
-  let cards = [];
-  let rerenderCurrentCards = () => {};
+  let cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : [];
+
+  async function reloadReportsForView() {
+    if (!grid) return;
+    try {
+      const reportsLoading = document.querySelector('#reports-loading');
+      if (reportsLoading) reportsLoading.style.display = 'block';
+
+      const reports = await fetchReports(pageRoot, state.viewYear, state.viewMonth);
+      grid.innerHTML = reports.map(toReportCardHtml).join('');
+      cards = Array.from(grid.querySelectorAll('[data-report]'));
+    } catch (e) {
+      console.error('日報一覧の取得に失敗しました:', e);
+      grid.innerHTML = '';
+      cards = [];
+    } finally {
+      const reportsLoading = document.querySelector('#reports-loading');
+      if (reportsLoading) reportsLoading.style.display = 'none';
+    }
+  }
 
   // --------------------
   // モーダル（登録 / 詳細 / 編集）
@@ -55,6 +82,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const createModal = document.querySelector('#new-modal-backdrop');
   const detailModal = document.querySelector('#detail-modal-backdrop');
   const editModal = document.querySelector('#edit-modal-backdrop');
+  const imageViewerModal = document.querySelector('#image-viewer-backdrop');
+  const imageViewerImage = document.querySelector('#image-viewer-image');
 
   const createForm = document.querySelector('#report-create-form');
   const editForm = document.querySelector('#report-edit-form');
@@ -64,11 +93,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const createMsg = document.querySelector('#new-message');
   const editMsg = document.querySelector('#edit-message');
 
-  const detailMeta = document.querySelector('#detail-meta');
-  const detailTitle = document.querySelector('#detail-title');
-  const detailTags = document.querySelector('#detail-tags');
-  const detailTime = document.querySelector('#detail-time');
-  const detailMemo = document.querySelector('#detail-memo');
   // NOTE: role_id により「編集」ボタン自体が描画されない場合がある
   const detailEditBtn = document.querySelector('#detail-edit');
 
@@ -81,11 +105,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireCropVarietyDynamic(editForm);
   wireImagePreview({ formEl: createForm, fileInputSelector: '#new-image-file', imageSelector: '#new-image', wrapperSelector: '#new-image-wrapper', placeholderSelector: '#new-image-placeholder' });
   wireImagePreview({ formEl: editForm, fileInputSelector: '#edit-image-file', imageSelector: '#edit-image', wrapperSelector: '#edit-image-wrapper', placeholderSelector: '#edit-image-placeholder' });
+  wireModal(imageViewerModal);
+
+  const detailImage = document.querySelector('#detail-image');
+  const detailImageWrapper = detailImage ? detailImage.closest('.detail-image-wrapper') : null;
+
+  function openDetailImageViewer() {
+    if (!detailImage || !imageViewerModal || !imageViewerImage) return;
+    const src = String(detailImage.dataset.fullSrc || detailImage.getAttribute('src') || '').trim();
+    if (!src || src === '/img/agri-login-bg.png') return;
+    imageViewerImage.src = src;
+    imageViewerImage.alt = detailImage.alt || '作業画像';
+    openModal(imageViewerModal);
+  }
+
+  if (detailImageWrapper) {
+    detailImageWrapper.addEventListener('click', function () {
+      openDetailImageViewer();
+    });
+  }
+  if (detailImage) {
+    detailImage.addEventListener('click', function (e) {
+      e.stopPropagation();
+      openDetailImageViewer();
+    });
+  }
 
   // ESCで閉じる
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    [createModal, detailModal, editModal].forEach(function (m) {
+    [createModal, detailModal, editModal, imageViewerModal].forEach(function (m) {
       if (m && m.classList.contains('open')) closeModal(m);
     });
   });
@@ -117,55 +166,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     pageSize: 8,
   };
 
+  // 年月ピッカー初期化（カードから範囲推定）
+  const years = extractYears(cards, state.viewYear);
+  if (yearSelect) {
+    yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}年</option>`).join('');
+    yearSelect.value = String(state.viewYear);
+  }
   if (monthSelect) monthSelect.value = String(state.viewMonth);
+
+  await reloadReportsForView();
 
   // --------------------
   // 再描画
   // --------------------
   function rerender({ resetPage = true } = {}) {
-    rerenderCurrentCards(resetPage);
-  }
-
-  async function fetchAndRender({ resetPage = true } = {}) {
     if (resetPage) state.page = 1;
-    try {
-      const result = await reloadReports({
-        pageRoot,
-        grid,
-        state,
-        emptyMessage,
-        headerTitle,
-        headerMeta,
-        pagination,
-        pagePrev,
-        pageNext,
-        pageInfo,
-        filterAllBtn,
-        searchInput,
-        ownerFilter,
-        fieldFilter,
-        taskFilter,
-        monthLabel,
-        yearSelect,
-        monthSelect,
-        calDaysRoot,
-      });
-      cards = result.cards;
-      rerenderCurrentCards = result.rerenderExternal;
-    } catch (e) {
-      console.error('日報一覧の取得に失敗しました:', e);
-      grid.innerHTML = '';
-      cards = [];
-      rerenderCurrentCards = () => {
-        applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, ownerFilter, fieldFilter, taskFilter });
-        syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
-        renderCalendar(calDaysRoot, state, cards, () => rerender({ resetPage: true }));
-      };
-      rerenderCurrentCards(true);
-    }
+    renderCalendar(calDaysRoot, state, cards, () => rerender({ resetPage: true }));
+    applyFiltersAndPagination({
+      cards,
+      state,
+      emptyMessage,
+      headerTitle,
+      headerMeta,
+      pagination,
+      pagePrev,
+      pageNext,
+      pageInfo,
+    });
+    syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
   }
-
-  await fetchAndRender({ resetPage: true });
 
   // --------------------
   // UIイベント
@@ -186,22 +215,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (ownerFilter) {
     ownerFilter.addEventListener('change', async () => {
       state.owner = ownerFilter.value;
-      state.selectedDate = null;
-      await fetchAndRender();
+      if (isRole1) {
+        await refreshFieldFilterByOwner({ ownerFilter, fieldFilter, selectedOwnerId: state.owner });
+        state.field = '';
+      }
+      rerender();
     });
   }
   if (fieldFilter) {
-    fieldFilter.addEventListener('change', async () => {
+    fieldFilter.addEventListener('change', () => {
       state.field = fieldFilter.value;
-      state.selectedDate = null;
-      await fetchAndRender();
+      rerender();
     });
   }
   if (taskFilter) {
-    taskFilter.addEventListener('change', async () => {
+    taskFilter.addEventListener('change', () => {
       state.task = taskFilter.value;
-      state.selectedDate = null;
-      await fetchAndRender();
+      rerender();
     });
   }
 
@@ -211,7 +241,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       state.viewYear = d.getFullYear();
       state.viewMonth = d.getMonth();
       state.selectedDate = null;
-      await fetchAndRender({ resetPage: true });
+      await reloadReportsForView();
+      rerender({ resetPage: false });
     });
   }
   if (btnNextMonth) {
@@ -220,7 +251,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       state.viewYear = d.getFullYear();
       state.viewMonth = d.getMonth();
       state.selectedDate = null;
-      await fetchAndRender({ resetPage: true });
+      await reloadReportsForView();
+      rerender({ resetPage: false });
     });
   }
 
@@ -239,8 +271,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.viewMonth = m;
       }
       state.selectedDate = null;
+      await reloadReportsForView();
       if (ymPicker) ymPicker.hidden = true;
-      await fetchAndRender({ resetPage: true });
+      rerender({ resetPage: false });
     });
   }
   document.addEventListener('click', (e) => {
@@ -327,31 +360,49 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 新規登録
   if (createForm) {
-    createForm.addEventListener('submit', function (e) {
+    createForm.addEventListener('submit', async function (e) {
       e.preventDefault();
       setMessage(createMsg, '', '');
+      if (createSaveBtn) createSaveBtn.disabled = true;
 
-      const fd = new FormData(createForm);
-      const data = normalizeFormData(fd, createForm);
+      try {
+        const fd = new FormData(createForm);
+        const data = normalizeFormData(fd, createForm);
+        const errorMessage = validateCreateWorkReportData(data);
+        if (errorMessage) {
+          setMessage(createMsg, errorMessage, 'error');
+          return;
+        }
 
-      if (!data.date || !data.task || !data.owner || !data.field) {
-        setMessage(createMsg, '必須項目を入力してください', 'error');
-        return;
+        const created = await createWorkReportViaGraphQL(createForm, data);
+        const merged = mergeCreatedReportIntoCardData(data, created);
+
+        const el = buildReportCardElement(merged);
+        if (merged.id) {
+          el.dataset.reportId = merged.id;
+          el.dataset.id = merged.id;
+        }
+        if (grid) grid.prepend(el);
+
+        // cards配列更新
+        cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : cards;
+
+        // 選択日を登録日へ寄せる（UX）
+        state.selectedDate = merged.date;
+        state.viewYear = parseInt(merged.date.slice(0, 4), 10);
+        state.viewMonth = parseInt(merged.date.slice(5, 7), 10) - 1;
+
+        closeModal(createModal);
+        createForm.reset();
+        syncCropVarietySelect(createForm, '', { id: '', name: '' });
+        resetImagePreview({ imageSelector: '#new-image', wrapperSelector: '#new-image-wrapper', placeholderSelector: '#new-image-placeholder' });
+        rerender({ resetPage: true });
+      } catch (err) {
+        console.error('[report] createWorkReport failed:', err);
+        setMessage(createMsg, err.message || '日報の登録に失敗しました', 'error');
+      } finally {
+        if (createSaveBtn) createSaveBtn.disabled = false;
       }
-
-      const el = buildReportCardElement(data);
-      if (grid) grid.prepend(el);
-
-      // cards配列更新
-      cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : cards;
-
-      // 選択日を登録日へ寄せる（UX）
-      state.selectedDate = data.date;
-      state.viewYear = parseInt(data.date.slice(0, 4), 10);
-      state.viewMonth = parseInt(data.date.slice(5, 7), 10) - 1;
-
-      closeModal(createModal);
-      rerender({ resetPage: true });
     });
   }
 
@@ -391,142 +442,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 // --------------------
 function qs(sel, root) { return (root || document).querySelector(sel); }
 function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
-
-function pad2(n) { return String(n).padStart(2, '0'); }
-
-function startOfMonthKey(year, month0) {
-  return `${year}-${pad2(month0 + 1)}-01`;
-}
-
-function endOfMonthKey(year, month0) {
-  return formatDate(new Date(year, month0 + 1, 0));
-}
-
-function getSelectedLabel(selectEl) {
-  if (!selectEl) return '';
-  const opt = selectEl.options?.[selectEl.selectedIndex];
-  return (opt?.dataset?.label || opt?.textContent || '').trim();
-}
-
-function isNumericLike(value) {
-  return /^\d+$/.test(String(value || '').trim());
-}
-
-function buildReportQuery() {
-  return `
-    query FindWorkReports($startDate: Date!, $endDate: Date!, $ownerID: ID, $fieldID: ID, $workTypeID: ID) {
-      findWorkReports(startDate: $startDate, endDate: $endDate, ownerID: $ownerID, fieldID: $fieldID, workTypeID: $workTypeID) {
-        id
-        workDate
-        workHours
-        workDetail
-        imageURL
-        user {
-          id
-          email
-          firstName
-          lastName
-          farmName
-        }
-        field {
-          id
-          name
-          fieldCode
-        }
-        workType {
-          id
-          name
-          sortOrder
-        }
-        cropVariety {
-          id
-          name
-          cropItem { id name }
-        }
-        weather {
-          code
-          japanese
-        }
-      }
-    }
-  `;
-}
-
-function normalizeReport(r) {
-  const fieldName = String(r?.field?.name || r?.field?.fieldName || '').trim();
-  const fieldId = r?.field?.id != null ? String(r.field.id) : '';
-  const wt = r?.workType;
-  const taskName = String((wt && typeof wt === 'object') ? (wt.name || '') : (r?.reportType || r?.workType || '')).trim() || '日報';
-  const taskId = wt && typeof wt === 'object' && wt.id != null ? String(wt.id) : '';
-  const userName = [r?.user?.lastName, r?.user?.firstName].filter(Boolean).join(' ').trim() || String(r?.user?.farmName || r?.user?.email || '').trim();
-  const ownerId = r?.user?.id != null ? String(r.user.id) : '';
-  const cropVarietyName = String(r?.cropVariety?.name || '').trim();
-  const cropVarietyId = r?.cropVariety?.id != null ? String(r.cropVariety.id) : '';
-  const cropItemName = String(r?.cropVariety?.cropItem?.name || '').trim();
-  const cropItemId = r?.cropVariety?.cropItem?.id != null ? String(r.cropVariety.cropItem.id) : '';
-  const weatherName = String(r?.weather?.japanese || '').trim();
-  const weatherCode = r?.weather?.code != null ? String(r.weather.code) : '';
-  const memo = String(r?.workDetail || '').trim();
-  const date = String(r?.workDate || r?.reportDate || r?.date || '').trim();
-  const hours = Number(r?.workHours);
-  const time = Number.isFinite(hours) && hours > 0 ? `${hours}時間` : '';
-  const title = defaultTitleForTask(taskName, fieldName);
-  const text = [taskName, fieldName, userName, cropItemName, cropVarietyName, memo, weatherName].filter(Boolean).join(' ');
-  return {
-    id: r?.id != null ? String(r.id) : '',
-    date,
-    task: taskName,
-    taskId,
-    owner: userName,
-    ownerId,
-    field: fieldName,
-    fieldId,
-    title,
-    memo,
-    time,
-    cropItemId,
-    cropItemName,
-    cropVarietyId,
-    cropVarietyName,
-    weatherCode,
-    weatherName,
-    imageURL: String(r?.imageURL || '').trim(),
-    text,
-  };
-}
-
-async function reloadReports({ pageRoot, grid, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, filterAllBtn, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, calDaysRoot }) {
-  const loadingEl = document.querySelector('#reports-loading');
-  if (loadingEl) loadingEl.style.display = 'block';
-
-  try {
-    const reports = await fetchReports(pageRoot, state);
-    const normalized = reports.map(normalizeReport);
-    grid.innerHTML = normalized.map(toReportCardHtml).join('');
-    const cards = Array.from(grid.querySelectorAll('[data-report]'));
-
-    const years = extractYears(cards, state.viewYear);
-    if (yearSelect) {
-      yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}年</option>`).join('');
-      yearSelect.value = String(state.viewYear);
-    }
-
-    renderCalendar(calDaysRoot, state, cards, () => rerenderExternal(true));
-    applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, ownerFilter, fieldFilter, taskFilter });
-    syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
-
-    function rerenderExternal(resetPage) {
-      state.page = resetPage ? 1 : state.page;
-      applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, ownerFilter, fieldFilter, taskFilter });
-      syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
-      renderCalendar(calDaysRoot, state, cards, () => rerenderExternal(true));
-    }
-
-    return { cards, rerenderExternal };
-  } finally {
-    if (loadingEl) loadingEl.style.display = 'none';
-  }
-}
 
 
 function resetImagePreview({ imageSelector, wrapperSelector, placeholderSelector }) {
@@ -614,44 +529,80 @@ function getSelectedText(selectEl) {
   return (opt && opt.textContent) ? opt.textContent.trim() : '';
 }
 
+function normalizeSelectToken(value) {
+  return String(value ?? '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .normalize('NFKC');
+}
+
 function setSelectByText(selectEl, text) {
-  if (!selectEl || !text) return;
-  const want = String(text).trim();
+  if (!selectEl || !text) return false;
+  const want = normalizeSelectToken(text);
   const opts = Array.from(selectEl.options || []);
-  const hit = opts.find(o => (o.textContent || '').trim() === want);
-  if (hit) selectEl.value = hit.value;
+  const idx = opts.findIndex(o => normalizeSelectToken(o.textContent || '') === want);
+  if (idx >= 0) {
+    selectEl.selectedIndex = idx;
+    selectEl.value = opts[idx].value;
+    return true;
+  }
+  return false;
+}
+
+function setSelectValueOrText(selectEl, value, text) {
+  if (!selectEl) return false;
+  const wantValue = normalizeSelectToken(value);
+  const opts = Array.from(selectEl.options || []);
+
+  if (wantValue) {
+    const idx = opts.findIndex(o => normalizeSelectToken(o.value) === wantValue);
+    if (idx >= 0) {
+      selectEl.selectedIndex = idx;
+      selectEl.value = opts[idx].value;
+      return true;
+    }
+  }
+
+  return setSelectByText(selectEl, text);
 }
 
 function normalizeFormData(fd, formEl) {
   const date = (fd.get('date') || '').toString().trim();
 
-  // task: keep ID for future API, but show NAME in UI
   const taskId = (fd.get('task') || '').toString().trim();
   const taskName = getSelectedText(formEl?.querySelector('[name="task"]')) || taskId;
 
-  // 担当者: ログインユーザー固定（フォームには hidden の owner_id が入る）
   const ownerId = (fd.get('owner_id') || '').toString().trim();
-  // disabled input は FormData に乗らないため、表示名はDOMから取得
   const owner = (formEl?.querySelector('#new-owner')?.value || formEl?.querySelector('#edit-owner')?.value || '').toString().trim() || ownerId;
 
-  // field: keep ID for future API, but show NAME in UI
   const fieldId = (fd.get('field_id') || fd.get('field') || '').toString().trim();
   const fieldName = getSelectedText(formEl?.querySelector('[name="field_id"]')) || (fd.get('field') || '').toString().trim();
 
-  const title = (fd.get('title') || '').toString().trim();
-  const timeStart = (fd.get('timeStart') || '').toString().trim();
-  const timeEnd = (fd.get('timeEnd') || '').toString().trim();
-  const memo = (fd.get('memo') || '').toString().trim();
+  const memo = ((
+    qs('#new-note-text', formEl)?.value ||
+    qs('#edit-note-text', formEl)?.value ||
+    document.getElementById('new-note-text')?.value ||
+    document.getElementById('edit-note-text')?.value ||
+    fd.get('memo') ||
+    ''
+  ) + '').trim();
+  const hours = (fd.get('hours') || '').toString().trim();
+  const title = memo ? memo.split(/\r?\n/)[0].trim().slice(0, 60) : '';
 
-  // optional masters (kept for future)
   const cropItemId = (fd.get('crop_item_id') || '').toString().trim();
   const cropItemName = getSelectedText(formEl?.querySelector('[name="crop_item_id"]')) || '';
   const cropVarietyId = (fd.get('crop_variety_id') || '').toString().trim();
   const cropVarietyName = getSelectedText(formEl?.querySelector('[name="crop_variety_id"]')) || '';
   const weatherCode = (fd.get('weather') || '').toString().trim();
+  const weatherName = getSelectedText(formEl?.querySelector('[name="weather"]')) || '';
 
-  const time = (timeStart || timeEnd) ? `${timeStart || '—'}〜${timeEnd || '—'}` : '';
-  const text = [taskName, cropItemName, cropVarietyName, title, fieldName, owner, memo].filter(Boolean).join(' ');
+  const modalRoot = formEl?.closest('.modal') || document;
+  const previewImg = qs('#new-image', modalRoot) || qs('#edit-image', modalRoot);
+  const imageUrl = previewImg && !previewImg.hidden ? (previewImg.getAttribute('src') || '') : '';
+
+  const time = hours ? `${hours}h` : '';
+  const text = [taskName, cropItemName, cropVarietyName, title, fieldName, owner, memo, weatherName].filter(Boolean).join(' ');
 
   return {
     date,
@@ -662,15 +613,16 @@ function normalizeFormData(fd, formEl) {
     field: fieldName,
     fieldId,
     title,
-    timeStart,
-    timeEnd,
     time,
+    hours,
     memo,
     cropItemId,
     cropItemName,
     cropVarietyId,
     cropVarietyName,
     weatherCode,
+    weatherName,
+    imageUrl,
     text
   };
 }
@@ -680,64 +632,78 @@ function readCardData(card) {
   const date = ds.date || '';
   const task = ds.task || '';
   const owner = ds.owner || '';
+  const ownerId = ds.ownerId || '';
   const field = ds.field || '';
+  const fieldId = ds.fieldId || '';
   const title = ds.title || qs('.report-title', card)?.textContent?.trim() || '';
   const memo = ds.memo || '';
   const cropItemId = ds.cropItemId || '';
   const cropItemName = ds.cropItemName || '';
   const cropVarietyId = ds.cropVarietyId || '';
   const cropVarietyName = ds.cropVarietyName || '';
-  const time = ds.time || qs('.badge-time', card)?.textContent?.replace('🕒', '')?.trim() || '';
-  const text = ds.text || [task, cropItemName, cropVarietyName, title, field, owner, memo].filter(Boolean).join(' ');
-  const id = ds.reportId || ds.id || '';
-  const taskId = ds.taskId || '';
-  const fieldId = ds.fieldId || '';
-  const ownerId = ds.ownerId || '';
   const weatherCode = ds.weatherCode || '';
   const weatherName = ds.weatherName || '';
-  const imageURL = ds.imageUrl || '';
-  return { id, date, task, taskId, owner, ownerId, field, fieldId, title, memo, time, text, cropItemId, cropItemName, cropVarietyId, cropVarietyName, weatherCode, weatherName, imageURL };
+  const hours = ds.hours || '';
+  const imageUrl = ds.imageUrl || '';
+  const updatedAt = ds.updatedAt || '';
+  const time = ds.time || (hours ? `${hours}h` : '');
+  const text = ds.text || [task, cropItemName, cropVarietyName, title, field, owner, memo, weatherName].filter(Boolean).join(' ');
+  const id = ds.reportId || ds.id || '';
+  return { id, date, task, owner, ownerId, field, fieldId, title, memo, time, hours, text, cropItemId, cropItemName, cropVarietyId, cropVarietyName, weatherCode, weatherName, imageUrl, updatedAt };
 }
 
 function fillDetailModal(data) {
-  const meta = toJaMetaLine(data.date, data.field, data.owner);
-  const tagsHtml = [
-    data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '',
-  ].filter(Boolean).join('');
+  const detailDate = qs('#detail-date');
+  const detailTask = qs('#detail-task');
+  const detailCropItem = qs('#detail-crop-item');
+  const detailCropVariety = qs('#detail-crop-variety');
+  const detailOwner = qs('#detail-owner');
+  const detailField = qs('#detail-field');
+  const detailWeather = qs('#detail-weather');
+  const detailHours = qs('#detail-time-hours');
+  const detailUpdatedAt = qs('#detail-updated-at');
+  const detailNote = qs('#detail-note-text');
+  const detailImage = qs('#detail-image');
+  const detailMetaFooter = qs('#detail-meta-footer');
 
-  const detailMeta = qs('#detail-meta');
-  const detailTitle = qs('#detail-title');
-  const detailTags = qs('#detail-tags');
-  const detailTime = qs('#detail-time');
-  const detailMemo = qs('#detail-memo');
-
-  if (detailMeta) detailMeta.textContent = meta;
-  if (detailTitle) detailTitle.textContent = data.title || '（タイトル未設定）';
-  if (detailTags) detailTags.innerHTML = tagsHtml || '<span class="report-tag">—</span>';
-  if (detailTime) detailTime.textContent = data.time || '—';
-  if (detailMemo) detailMemo.textContent = data.memo || '—';
-
-  const img = qs('#detail-image');
-  if (img) {
-    img.src = data.imageURL || '/img/agri-login-bg.png';
-    img.onerror = function () { this.onerror = null; this.src = '/img/agri-login-bg.png'; };
+  if (detailDate) detailDate.value = data.date || '';
+  if (detailTask) {
+    detailTask.value = '';
+    setSelectByText(detailTask, data.task || '');
   }
-  const note = qs('#detail-note-text');
-  if (note) note.value = data.memo || '';
-  const dateEl = qs('#detail-date');
-  if (dateEl) dateEl.value = data.date || '';
-  const taskEl = qs('#detail-task');
-  if (taskEl) { taskEl.value = data.taskId || ''; if (!taskEl.value && data.task) setSelectByText(taskEl, data.task); }
-  const cropItemEl = qs('#detail-crop-item');
-  if (cropItemEl) { cropItemEl.value = data.cropItemId || ''; if (!cropItemEl.value && data.cropItemName) setSelectByText(cropItemEl, data.cropItemName); }
-  const ownerEl = qs('#detail-owner');
-  if (ownerEl) ownerEl.value = data.owner || '';
-  const fieldEl = qs('#detail-field');
-  if (fieldEl) { fieldEl.value = data.fieldId || ''; if (!fieldEl.value && data.field) setSelectByText(fieldEl, data.field); }
-  const weatherEl = qs('#detail-weather');
-  if (weatherEl) { weatherEl.value = data.weatherCode || ''; if (!weatherEl.value && data.weatherName) setSelectByText(weatherEl, data.weatherName); }
+  if (detailCropItem) {
+    setSelectValueOrText(detailCropItem, data.cropItemId || '', data.cropItemName || '');
+  }
+  if (detailCropVariety) detailCropVariety.value = data.cropVarietyName || '';
+  if (detailOwner) detailOwner.value = data.owner || '';
+  if (detailField) {
+    detailField.value = data.fieldId || '';
+    if (!detailField.value && data.field) setSelectByText(detailField, data.field);
+  }
+  if (detailWeather) {
+    detailWeather.value = data.weatherCode || '';
+    if (!detailWeather.value && data.weatherName) setSelectByText(detailWeather, data.weatherName);
+  }
+  if (detailHours) detailHours.value = data.hours || '';
+  if (detailUpdatedAt) detailUpdatedAt.value = data.updatedAt || '—';
+  if (detailNote) detailNote.value = data.memo || '';
+  if (detailImage) {
+    const fullSrc = String(data.imageUrl || '').trim();
+    const hasImage = !!fullSrc;
+    detailImage.src = hasImage ? fullSrc : '/img/agri-login-bg.png';
+    detailImage.dataset.fullSrc = fullSrc;
+    detailImage.style.cursor = hasImage ? 'zoom-in' : 'default';
+    const wrapper = detailImage.closest('.detail-image-wrapper');
+    if (wrapper) {
+      wrapper.classList.toggle('is-clickable', hasImage);
+      wrapper.setAttribute('title', hasImage ? 'クリックで拡大表示' : '');
+    }
+  }
+  if (detailMetaFooter) {
+    const parts = [formatDateJa(data.date) || '', data.field || '', data.owner || ''].filter(Boolean);
+    detailMetaFooter.textContent = parts.join(' ／ ');
+  }
 }
-
 
 
 async function fetchCropVarieties(itemID) {
@@ -820,68 +786,141 @@ function wireCropVarietyDynamic(formEl) {
   });
 }
 
-function fillEditForm(data) {
+async function fillEditForm(data) {
   const editForm = qs('#report-edit-form');
   if (!editForm) return;
 
-  qs('#edit-date', editForm).value = data.date || '';
-  // select value is ID, but card stores task NAME -> match by option text
+  const dateInput = qs('#edit-date', editForm);
+  if (dateInput) dateInput.value = data.date || '';
+
   const taskSel = qs('#edit-task', editForm);
   if (taskSel) {
-    taskSel.value = '';
-    setSelectByText(taskSel, data.task || '');
+    taskSel.value = data.taskId || '';
+    if (!taskSel.value && data.task) setSelectByText(taskSel, data.task);
   }
+
   const cropItemSel = qs('#edit-crop-item', editForm);
   if (cropItemSel) {
-    cropItemSel.value = data.cropItemId || '';
-    if (!cropItemSel.value && data.cropItemName) setSelectByText(cropItemSel, data.cropItemName);
-    syncCropVarietySelect(editForm, cropItemSel.value, { id: data.cropVarietyId || '', name: data.cropVarietyName || '' });
+    setSelectValueOrText(cropItemSel, data.cropItemId || '', data.cropItemName || '');
+    await syncCropVarietySelect(editForm, cropItemSel.value, { id: data.cropVarietyId || '', name: data.cropVarietyName || '' });
   }
-  qs('#edit-owner', editForm).value = data.owner || '';
+
+  const ownerInput = qs('#edit-owner', editForm);
+  if (ownerInput) ownerInput.value = data.owner || '';
+  const ownerIdHidden = qs('#edit-owner-id', editForm);
+  if (ownerIdHidden) ownerIdHidden.value = data.ownerId || ownerIdHidden.value || '';
+
   const fieldSel = qs('#edit-field', editForm);
   if (fieldSel) {
-    fieldSel.value = '';
-    setSelectByText(fieldSel, data.field || '');
+    fieldSel.value = data.fieldId || '';
+    if (!fieldSel.value && data.field) setSelectByText(fieldSel, data.field);
   }
-  qs('#edit-title', editForm).value = data.title || '';
-  qs('#edit-memo', editForm).value = data.memo || '';
 
-  // time split (09:00〜11:00)
-  const m = (data.time || '').match(/(\d{2}:\d{2})\s*〜\s*(\d{2}:\d{2})/);
-  qs('#edit-time-start', editForm).value = m ? m[1] : '';
-  qs('#edit-time-end', editForm).value = m ? m[2] : '';
+  const weatherSel = qs('#edit-weather', editForm);
+  if (weatherSel) {
+    weatherSel.value = data.weatherCode || '';
+    if (!weatherSel.value && data.weatherName) setSelectByText(weatherSel, data.weatherName);
+  }
+
+  const hoursInput = qs('#edit-time-hours', editForm);
+  if (hoursInput) hoursInput.value = data.hours || '';
+
+  const noteInput = qs('#edit-note-text');
+  if (noteInput) noteInput.value = data.memo || '';
 
   const hidden = qs('#edit-target-id', editForm);
   if (hidden) hidden.value = data.id || '';
-  resetImagePreview({ imageSelector: '#edit-image', wrapperSelector: '#edit-image-wrapper', placeholderSelector: '#edit-image-placeholder' });
+
+  const img = qs('#edit-image');
+  const wrapper = qs('#edit-image-wrapper');
+  const placeholder = qs('#edit-image-placeholder');
+  if (img && data.imageUrl) {
+    img.src = data.imageUrl;
+    img.hidden = false;
+    if (placeholder) placeholder.hidden = true;
+    if (wrapper) wrapper.classList.remove('is-empty');
+  } else {
+    resetImagePreview({ imageSelector: '#edit-image', wrapperSelector: '#edit-image-wrapper', placeholderSelector: '#edit-image-placeholder' });
+  }
 }
 
 function buildReportCardElement(data) {
-  const html = toReportCardHtml(data);
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html.trim();
-  return tmp.firstElementChild;
+  const el = document.createElement('article');
+  el.className = 'report-card';
+  el.setAttribute('data-report', '');
+  if (data.id) {
+    el.dataset.reportId = data.id;
+    el.dataset.id = data.id;
+  }
+  el.dataset.date = data.date;
+  el.dataset.task = data.task;
+  el.dataset.taskId = data.taskId || '';
+  el.dataset.owner = data.owner;
+  el.dataset.ownerId = data.ownerId || '';
+  el.dataset.field = data.field;
+  el.dataset.fieldId = data.fieldId || '';
+  el.dataset.title = data.title || '';
+  el.dataset.memo = data.memo || '';
+  el.dataset.time = data.time || '';
+  el.dataset.hours = data.hours || '';
+  el.dataset.cropItemId = data.cropItemId || '';
+  el.dataset.cropItemName = data.cropItemName || '';
+  el.dataset.cropVarietyId = data.cropVarietyId || '';
+  el.dataset.cropVarietyName = data.cropVarietyName || '';
+  el.dataset.weatherCode = data.weatherCode || '';
+  el.dataset.weatherName = data.weatherName || '';
+  el.dataset.imageUrl = data.imageUrl || '';
+  el.dataset.updatedAt = formatUpdatedNow();
+  el.dataset.text = data.text || '';
+
+  const meta = toJaMetaLine(data.date, data.field, data.owner);
+  const title = data.title || defaultTitleForTask(data.task, data.field);
+  const tag = data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '';
+  const hoursBadge = buildHoursBadge(data.hours);
+  const weatherBadge = escapeHtml(buildWeatherBadge(data.weatherCode, data.weatherName));
+  const thumb = data.imageUrl ? `<img src="${escapeHtml(data.imageUrl)}" alt="${escapeHtml(data.task || '作業')}の様子">` : '';
+
+  el.innerHTML = `
+    <div class="report-thumb">${thumb}</div>
+    <div class="report-content">
+      <div class="report-meta">${escapeHtml(meta)}</div>
+      <div class="report-title">${escapeHtml(title)}</div>
+      <div class="report-tags">${tag || '<span class="report-tag">—</span>'}</div>
+      <div class="report-footer">
+        <div class="report-footer-left">
+          <span class="badge-weather">${weatherBadge}</span>
+        </div>
+        <div class="report-footer-right">
+          <span class="badge-time">${hoursBadge}</span>
+          <span class="badge-updated">最終更新：${escapeHtml(el.dataset.updatedAt)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+  return el;
 }
 
 function applyCardUpdate(card, data) {
   if (!card) return;
   card.dataset.date = data.date;
   card.dataset.task = data.task;
+  card.dataset.taskId = data.taskId || '';
   card.dataset.owner = data.owner;
+  card.dataset.ownerId = data.ownerId || '';
   card.dataset.field = data.field;
+  card.dataset.fieldId = data.fieldId || '';
   card.dataset.title = data.title || '';
   card.dataset.memo = data.memo || '';
   card.dataset.time = data.time || '';
-  card.dataset.taskId = data.taskId || '';
-  card.dataset.ownerId = data.ownerId || '';
-  card.dataset.fieldId = data.fieldId || '';
+  card.dataset.hours = data.hours || '';
   card.dataset.cropItemId = data.cropItemId || '';
   card.dataset.cropItemName = data.cropItemName || '';
   card.dataset.cropVarietyId = data.cropVarietyId || '';
   card.dataset.cropVarietyName = data.cropVarietyName || '';
   card.dataset.weatherCode = data.weatherCode || '';
   card.dataset.weatherName = data.weatherName || '';
-  card.dataset.imageUrl = data.imageURL || '';
+  card.dataset.imageUrl = data.imageUrl || '';
+  card.dataset.updatedAt = formatUpdatedNow();
   card.dataset.text = data.text || '';
 
   const meta = toJaMetaLine(data.date, data.field, data.owner);
@@ -892,17 +931,15 @@ function applyCardUpdate(card, data) {
   const timeEl = qs('.badge-time', card);
   const updEl = qs('.badge-updated', card);
   const weatherEl = qs('.badge-weather', card);
-  const workerEl = qs('.badge-worker', card);
-  const imgEl = qs('.report-thumb img', card);
+  const thumbEl = qs('.report-thumb', card);
 
   if (metaEl) metaEl.textContent = meta;
   if (titleEl) titleEl.textContent = title;
   if (tagsEl) tagsEl.innerHTML = data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '<span class="report-tag">—</span>';
-  if (timeEl) timeEl.textContent = data.time ? `🕒 ${data.time}` : '🕒 —';
-  if (updEl) updEl.textContent = `作付：${data.cropVarietyName || data.cropItemName || '—'}`;
-  if (weatherEl) weatherEl.textContent = `⛅ ${data.weatherName || '—'}`;
-  if (workerEl) workerEl.textContent = `👨‍🌾 ${data.owner || '—'}`;
-  if (imgEl) { imgEl.src = data.imageURL || '/img/agri-login-bg.png'; imgEl.onerror = function () { this.onerror = null; this.src = '/img/agri-login-bg.png'; }; }
+  if (timeEl) timeEl.textContent = buildHoursBadge(data.hours);
+  if (weatherEl) weatherEl.textContent = buildWeatherBadge(data.weatherCode, data.weatherName);
+  if (updEl) updEl.textContent = `最終更新：${card.dataset.updatedAt}`;
+  if (thumbEl) thumbEl.innerHTML = data.imageUrl ? `<img src="${escapeHtml(data.imageUrl)}" alt="${escapeHtml(data.task || '作業')}の様子">` : '';
 }
 
 function toJaMetaLine(dateKey, field, owner) {
@@ -949,31 +986,445 @@ async function initLegacy(listRoot) {
   renderLegacyReportList(listRoot, reports);
 }
 
-async function fetchReports(listRoot, state) {
-  const query = buildReportQuery();
-  const userIdRaw = String(listRoot?.dataset?.userId || '').trim();
-  const safeState = state || { viewYear: new Date().getFullYear(), viewMonth: new Date().getMonth(), owner: '', field: '', task: '' };
-  const ownerFilterValue = String(safeState?.owner || '').trim();
+async function fetchReports(listRoot, viewYear, viewMonth) {
+  const userIdRaw = listRoot?.dataset?.userId;
+  if (!userIdRaw) return [];
+
+  const y = Number.isFinite(Number(viewYear)) ? Number(viewYear) : new Date().getFullYear();
+  const m = Number.isFinite(Number(viewMonth)) ? Number(viewMonth) : new Date().getMonth();
+  const startDate = formatDate(new Date(y, m, 1));
+  const endDate = formatDate(new Date(y, m + 1, 0));
+
+  const queries = [
+    `
+      query FindWorkReportsWithUserID($userID: ID!, $startDate: Date!, $endDate: Date!) {
+        findWorkReportsWithUserID(userID: $userID, startDate: $startDate, endDate: $endDate) {
+          id
+          workDate
+          workHours
+          workDetail
+          imageURL
+          user {
+            id
+            firstName
+            lastName
+            email
+            farmName
+          }
+          field {
+            id
+            name
+          }
+          workType {
+            id
+            name
+          }
+          cropVariety {
+            id
+            name
+            cropItem {
+              id
+              name
+            }
+          }
+          weather {
+            code
+            japanese
+          }
+        }
+      }
+    `,
+    `
+      query FindWorkReportsWithUserID($userID: ID!, $startDate: Date!, $endDate: Date!) {
+        findWorkReportsWithUserID(userID: $userID, startDate: $startDate, endDate: $endDate) {
+          id
+          workDate
+          workHours
+          workDetail
+          imageURL
+          user {
+            id
+            firstName
+            lastName
+            email
+            farmName
+          }
+          field {
+            id
+            name
+          }
+          workType {
+            id
+            name
+          }
+          cropVariety {
+            id
+            name
+          }
+          weather {
+            code
+            japanese
+          }
+        }
+      }
+    `
+  ];
+
   const variables = {
-    startDate: startOfMonthKey(safeState.viewYear, safeState.viewMonth),
-    endDate: endOfMonthKey(safeState.viewYear, safeState.viewMonth),
+    userID: String(userIdRaw),
+    startDate,
+    endDate,
   };
 
-  // ownerID はオーナー絞り込みが明示された場合のみ付与する。
-  // 初期表示は startDate / endDate のみで取得し、権限制御はサーバー側に委ねる。
-  // （非管理者で ownerID を自動付与すると upstream 側で 422 になる環境があるため）
-  if (ownerFilterValue && isNumericLike(ownerFilterValue)) {
-    variables.ownerID = ownerFilterValue;
+  let lastError = null;
+  for (const q of queries) {
+    const result = await window.gql(q, variables);
+    if (!result.errors) {
+      const reports = Array.isArray(result.data?.findWorkReportsWithUserID)
+        ? result.data.findWorkReportsWithUserID
+        : [];
+      return await enrichReportsWithCropItem(reports);
+    }
+    lastError = result.errors[0]?.message || 'GraphQL error';
+    console.warn('[report] fetchReports retry with fallback query:', result.errors);
   }
 
-  if (safeState?.field && isNumericLike(safeState.field)) variables.fieldID = String(safeState.field);
-  if (safeState?.task && isNumericLike(safeState.task)) variables.workTypeID = String(safeState.task);
+  throw new Error(lastError || 'GraphQL error');
+}
 
+let cropVarietyToItemMapPromise = null;
+
+async function enrichReportsWithCropItem(reports) {
+  const list = Array.isArray(reports) ? reports : [];
+  const needsEnrich = list.some(function (r) {
+    return r?.cropVariety?.id && !r?.cropVariety?.cropItem && !r?.cropItem;
+  });
+  if (!needsEnrich) return list;
+
+  try {
+    const map = await getCropVarietyToItemMap();
+    if (!(map instanceof Map) || !map.size) return list;
+
+    return list.map(function (r) {
+      if (!r?.cropVariety?.id) return r;
+      if (r?.cropVariety?.cropItem || r?.cropItem) return r;
+
+      const key = String(r.cropVariety.id);
+      const cropItem = map.get(key);
+      if (!cropItem) return r;
+
+      return {
+        ...r,
+        cropVariety: {
+          ...r.cropVariety,
+          cropItem: {
+            id: cropItem.id,
+            name: cropItem.name,
+          },
+        },
+      };
+    });
+  } catch (e) {
+    console.warn('[report] enrichReportsWithCropItem failed:', e);
+    return list;
+  }
+}
+
+function getCropItemIdsFromDom() {
+  const selectors = ['#new-crop-item', '#edit-crop-item', '#detail-crop-item'];
+  const ids = new Set();
+
+  selectors.forEach(function (selector) {
+    const selectEl = document.querySelector(selector);
+    if (!selectEl) return;
+    Array.from(selectEl.options || []).forEach(function (opt) {
+      const v = String(opt?.value || '').trim();
+      if (v) ids.add(v);
+    });
+  });
+
+  return Array.from(ids);
+}
+
+async function getCropVarietyToItemMap() {
+  if (!cropVarietyToItemMapPromise) {
+    cropVarietyToItemMapPromise = (async function () {
+      const itemIds = getCropItemIdsFromDom();
+      const map = new Map();
+
+      for (const itemID of itemIds) {
+        const varieties = await fetchCropVarieties(itemID);
+        (Array.isArray(varieties) ? varieties : []).forEach(function (v) {
+          const varietyId = String(v?.id || '').trim();
+          if (!varietyId) return;
+          map.set(varietyId, {
+            id: String(itemID),
+            name: findCropItemNameInDom(itemID),
+          });
+        });
+      }
+
+      return map;
+    })();
+  }
+  return cropVarietyToItemMapPromise;
+}
+
+function findCropItemNameInDom(itemID) {
+  const id = String(itemID || '').trim();
+  if (!id) return '';
+
+  const selectors = ['#new-crop-item', '#edit-crop-item', '#detail-crop-item'];
+  for (const selector of selectors) {
+    const selectEl = document.querySelector(selector);
+    if (!selectEl) continue;
+    const opt = Array.from(selectEl.options || []).find(function (o) {
+      return String(o?.value || '').trim() === id;
+    });
+    if (opt) return String(opt.textContent || '').trim();
+  }
+  return '';
+}
+
+
+async function initializeRole1Filters({ ownerFilter, fieldFilter }) {
+  if (!ownerFilter || !fieldFilter) return;
+  const [owners, fields] = await Promise.all([
+    fetchOwnersForFilter(),
+    fetchFieldsForOwner(''),
+  ]);
+  const ownerOptions = (Array.isArray(owners) && owners.length)
+    ? owners
+    : deriveOwnersFromReportCards();
+  populateOwnerFilterOptions(ownerFilter, ownerOptions);
+  populateFieldFilterOptions(fieldFilter, fields);
+}
+
+async function refreshFieldFilterByOwner({ ownerFilter, fieldFilter, selectedOwnerId }) {
+  if (!fieldFilter) return;
+  const fields = await fetchFieldsForOwner(selectedOwnerId || '');
+  populateFieldFilterOptions(fieldFilter, fields);
+}
+
+async function fetchOwnersForFilter() {
+  const query = `
+    query FindUsersForOwnerFilter($roleID: ID!) {
+      findUsers(roleID: $roleID) {
+        id
+        farmName
+        firstName
+        lastName
+        email
+      }
+    }
+  `;
+  const result = await window.gql(query, { roleID: '2' });
+  if (result?.errors?.length) {
+    console.warn('[report] findUsers for owner filter failed:', result.errors);
+    return [];
+  }
+  const list = Array.isArray(result?.data?.findUsers) ? result.data.findUsers : [];
+  return list
+    .map(function (u) {
+      return {
+        id: String(u?.id || '').trim(),
+        name: String(u?.farmName || '').trim() || [String(u?.lastName || '').trim(), String(u?.firstName || '').trim()].filter(Boolean).join(' ') || String(u?.email || '').trim(),
+      };
+    })
+    .filter(function (u) { return u.id && u.name; })
+    .sort(function (a, b) { return a.name.localeCompare(b.name, 'ja'); });
+}
+
+function deriveOwnersFromReportCards() {
+  const cards = Array.from(document.querySelectorAll('[data-report]'));
+  const uniq = new Map();
+  cards.forEach(function (card) {
+    const id = String(card?.dataset?.ownerId || '').trim();
+    const name = String(card?.dataset?.owner || '').trim();
+    if (!id || !name || uniq.has(id)) return;
+    uniq.set(id, { id, name });
+  });
+  return Array.from(uniq.values()).sort(function (a, b) {
+    return a.name.localeCompare(b.name, 'ja');
+  });
+}
+
+async function fetchFieldsForOwner(ownerId) {
+  const query = `
+    query FindFields($ownerID: ID) {
+      findFields(ownerID: $ownerID) {
+        id
+        name
+      }
+    }
+  `;
+  const variables = {};
+  if (String(ownerId || '').trim()) variables.ownerID = String(ownerId).trim();
   const result = await window.gql(query, variables);
-  if (result.errors) {
-    throw new Error(result.errors[0]?.message || 'GraphQL error');
+  if (result?.errors?.length) throw new Error(result.errors[0]?.message || 'Failed to fetch fields');
+  const list = Array.isArray(result?.data?.findFields) ? result.data.findFields : [];
+  return list
+    .map(function (f) {
+      return {
+        id: String(f?.id || '').trim(),
+        name: String(f?.name || '').trim(),
+      };
+    })
+    .filter(function (f) { return f.id && f.name; })
+    .sort(function (a, b) { return a.name.localeCompare(b.name, 'ja'); });
+}
+
+function populateOwnerFilterOptions(selectEl, owners) {
+  if (!selectEl) return;
+  const current = String(selectEl.value || '');
+  const list = Array.isArray(owners) ? owners : [];
+  selectEl.innerHTML = '<option value="">すべてのオーナー</option>' + list.map(function (o) {
+    return `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)}</option>`;
+  }).join('');
+  if (list.some(function (o) { return o.id === current; })) selectEl.value = current;
+}
+
+function populateFieldFilterOptions(selectEl, fields) {
+  if (!selectEl) return;
+  const current = String(selectEl.value || '');
+  const list = Array.isArray(fields) ? fields : [];
+  selectEl.innerHTML = '<option value="">すべての圃場</option>' + list.map(function (f) {
+    return `<option value="${escapeHtml(f.id)}">${escapeHtml(f.name)}</option>`;
+  }).join('');
+  if (list.some(function (f) { return f.id === current; })) selectEl.value = current;
+}
+
+function getSelectedOptionLabel(selectEl, value) {
+  if (!selectEl) return '';
+  const v = String(value || '');
+  const opt = Array.from(selectEl.options || []).find(function (o) {
+    return String(o?.value || '') === v;
+  });
+  return String(opt?.textContent || '').trim();
+}
+
+
+function formatHoursLabel(value) {
+  if (value === '' || value == null) return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+  return String(n).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+}
+
+function getWeatherIcon(code, name) {
+  const c = String(code == null ? '' : code).trim();
+  const n = String(name || '').trim();
+  if (['71','73','75','77','85','86'].includes(c) || /雪/.test(n)) return '❄️';
+  if (['95','96','99'].includes(c) || /雷/.test(n)) return '⛈️';
+  if (['51','53','55','56','57','61','63','65','66','67','80','81','82'].includes(c) || /雨|にわか/.test(n)) return '🌧️';
+  if (['45','48'].includes(c) || /霧|もや/.test(n)) return '🌫️';
+  if (['1'].includes(c) || /晴/.test(n)) return '☀️';
+  if (['2','3'].includes(c) || /曇|くも/.test(n)) return '☁️';
+  return n ? '🌤️' : '—';
+}
+
+function buildWeatherBadge(code, name) {
+  const label = String(name || '').trim();
+  const icon = getWeatherIcon(code, label);
+  return label ? `${icon} ${label}` : '—';
+}
+
+function buildHoursBadge(value) {
+  if (value === '' || value == null) return '⏱ —';
+  return `⏱ ${formatHoursLabel(value)}h`;
+}
+
+
+function buildCreateWorkReportInput(data) {
+  const rawHours = String(data.hours == null ? '' : data.hours).trim();
+  const parsedHours = rawHours === '' ? 0 : Number(rawHours);
+  const workDetail = String(data.memo == null ? '' : data.memo).trim();
+
+  return {
+    fieldID: String(data.fieldId || '').trim(),
+    workDate: String(data.date || '').trim(),
+    workHours: Number.isFinite(parsedHours) ? parsedHours : 0,
+    workTypeID: String(data.taskId || '').trim(),
+    cropVarietyID: String(data.cropVarietyId || '').trim(),
+    weatherCode: data.weatherCode === '' || data.weatherCode == null ? null : Number(data.weatherCode),
+    workDetail,
+    image: null,
+  };
+}
+
+function validateCreateWorkReportData(data) {
+  if (!data.date || !data.taskId || !data.fieldId) return '必須項目を入力してください';
+  if (!data.cropVarietyId) return '品種を選択してください';
+  if (!data.weatherCode) return '天候を選択してください';
+  if (data.hours !== '' && (Number.isNaN(Number(data.hours)) || Number(data.hours) < 0)) return '作業時間を正しく入力してください';
+  return '';
+}
+
+async function createWorkReportViaGraphQL(formEl, data) {
+  const mutation = `
+    mutation CreateWorkReport($input: CreateWorkReportInput!) {
+      createWorkReport(input: $input) {
+        id
+        workDate
+        workHours
+        workDetail
+        imageURL
+        field { id name }
+        workType { id name }
+        cropVariety { id name }
+        weather { code japanese }
+      }
+    }
+  `;
+
+  const input = buildCreateWorkReportInput(data);
+  const fileInput = qs('#new-image-file', formEl);
+  const file = fileInput?.files?.[0] || null;
+
+  let result;
+  if (file) {
+    result = await window.gqlMultipart(mutation, { input }, { 'input.image': file });
+  } else {
+    result = await window.gql(mutation, { input });
   }
-  return Array.isArray(result.data?.findWorkReports) ? result.data.findWorkReports : [];
+
+  if (result?.errors?.length) {
+    throw new Error(result.errors[0]?.message || '日報の登録に失敗しました');
+  }
+
+  return result?.data?.createWorkReport || null;
+}
+
+function mergeCreatedReportIntoCardData(data, created) {
+  const report = created || {};
+  return {
+    ...data,
+    id: String(report?.id || ''),
+    date: String(report?.workDate || data.date || ''),
+    hours: report?.workHours != null ? String(report.workHours) : String(data.hours || ''),
+    time: report?.workHours != null ? `${report.workHours}h` : (data.time || ''),
+    memo: String(report?.workDetail || data.memo || ''),
+    imageUrl: String(report?.imageURL || data.imageUrl || ''),
+    taskId: String(report?.workType?.id || data.taskId || ''),
+    task: String(report?.workType?.name || data.task || ''),
+    fieldId: String(report?.field?.id || data.fieldId || ''),
+    field: String(report?.field?.name || data.field || ''),
+    cropVarietyId: String(report?.cropVariety?.id || data.cropVarietyId || ''),
+    cropVarietyName: String(report?.cropVariety?.name || data.cropVarietyName || ''),
+    weatherCode: report?.weather?.code != null ? String(report.weather.code) : String(data.weatherCode || ''),
+    weatherName: String(report?.weather?.japanese || data.weatherName || ''),
+    title: String((report?.workDetail || data.memo || '').split(/\r?\n/)[0].trim().slice(0, 60) || data.title || ''),
+    text: [
+      String(report?.workType?.name || data.task || ''),
+      String(data.cropItemName || ''),
+      String(report?.cropVariety?.name || data.cropVarietyName || ''),
+      String(report?.field?.name || data.field || ''),
+      String(data.owner || ''),
+      String(report?.workDetail || data.memo || ''),
+      String(report?.weather?.japanese || data.weatherName || ''),
+    ].filter(Boolean).join(' '),
+  };
 }
 
 // --------------------
@@ -1038,11 +1489,10 @@ function renderCalendar(root, state, cards, onSelectDate) {
 // --------------------
 // 新UI: フィルタ & ページング
 // --------------------
-function applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo, ownerFilter, fieldFilter, taskFilter }) {
+function applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, headerMeta, pagination, pagePrev, pageNext, pageInfo }) {
   const filtered = cards.filter(c => {
     const d = (c.dataset.date || '').trim();
     const task = (c.dataset.task || '').trim();
-    const taskId = (c.dataset.taskId || '').trim();
     const owner = (c.dataset.owner || '').trim();
     const ownerId = (c.dataset.ownerId || '').trim();
     const field = (c.dataset.field || '').trim();
@@ -1050,9 +1500,9 @@ function applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, he
     const text = (c.dataset.text || '').toLowerCase();
 
     if (state.selectedDate && d !== state.selectedDate) return false;
-    if (state.task && taskId !== state.task && task !== state.task) return false;
-    if (state.owner && ownerId !== state.owner && owner !== state.owner) return false;
-    if (state.field && fieldId !== state.field && field !== state.field) return false;
+    if (state.task && task !== state.task) return false;
+    if (state.owner && ownerId !== state.owner) return false;
+    if (state.field && fieldId !== state.field) return false;
     if (state.search) {
       const q = state.search.toLowerCase();
       if (!text.includes(q)) return false;
@@ -1083,12 +1533,9 @@ function applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, he
   }
   if (headerMeta) {
     const parts = [];
-    const ownerLabel = getSelectedLabel(ownerFilter) || state.owner;
-    const fieldLabel = getSelectedLabel(fieldFilter) || state.field;
-    const taskLabel = getSelectedLabel(taskFilter) || state.task;
-    if (state.owner) parts.push(`オーナー：${ownerLabel}`);
-    if (state.field) parts.push(`圃場：${fieldLabel}`);
-    if (state.task) parts.push(`作業：${taskLabel}`);
+    if (state.owner) parts.push(`オーナー：${getSelectedOptionLabel(document.querySelector('#owner-filter'), state.owner) || state.owner}`);
+    if (state.field) parts.push(`圃場：${getSelectedOptionLabel(document.querySelector('#field-filter'), state.field) || state.field}`);
+    if (state.task) parts.push(`作業：${state.task}`);
     if (state.search) parts.push(`検索：「${state.search}」`);
     headerMeta.textContent = parts.length ? `${parts.join(' / ')}（${total}件）` : `今日を含む最近の作業が新しい順に表示されます。（${total}件）`;
   }
@@ -1114,58 +1561,56 @@ function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter
 // GraphQL -> 新UIの簡易カード
 // --------------------
 function toReportCardHtml(r) {
-  const data = normalizeReport(r);
-  const date = escapeHtml(data.date);
-  const task = escapeHtml(data.task);
-  const fieldName = escapeHtml(data.field);
-  const ownerName = escapeHtml(data.owner);
-  const title = escapeHtml(data.title || defaultTitleForTask(data.task, data.field));
-  const weatherName = escapeHtml(data.weatherName || '—');
-  const timeBadge = data.time ? `🕒 ${escapeHtml(data.time)}` : '🕒 —';
-  const imageUrl = escapeHtml(data.imageURL || '/img/agri-login-bg.png');
-  const text = escapeHtml(data.text || [data.task, data.field, data.owner, data.memo].filter(Boolean).join(' '));
-  const cropItemName = escapeHtml(data.cropItemName || '');
-  const cropVarietyName = escapeHtml(data.cropVarietyName || '');
-  const memo = escapeHtml(data.memo || '');
+  const workDate = r.workDate ?? r.reportDate ?? r.date ?? '';
+  const date = escapeHtml(workDate);
+  const taskName = r.workType?.name ?? r.reportType ?? r.workType ?? '日報';
+  const task = escapeHtml(taskName);
+  const taskId = escapeHtml(String(r.workType?.id ?? ''));
+  const fieldRawName = r.field?.fieldName ?? r.field?.name ?? '';
+  const fieldName = escapeHtml(fieldRawName);
+  const fieldId = escapeHtml(String(r.field?.id ?? ''));
+  const ownerId = escapeHtml(String(r.user?.id ?? ''));
+  const userNameRaw = r.user?.farmName || ((r.user?.firstName || r.user?.lastName)
+    ? `${r.user?.lastName ?? ''} ${r.user?.firstName ?? ''}`.trim()
+    : (r.user?.email ?? ''));
+  const ownerName = escapeHtml(userNameRaw);
+  const memoRaw = r.workDetail ?? '';
+  const memo = escapeHtml(memoRaw);
+  const cropItemRaw = r.cropItem ?? r.cropVariety?.cropItem ?? null;
+  const cropItemId = escapeHtml(String(cropItemRaw?.id ?? ''));
+  const cropItemNameRaw = cropItemRaw?.name ?? '';
+  const cropItemName = escapeHtml(cropItemNameRaw);
+  const cropVarietyId = escapeHtml(String(r.cropVariety?.id ?? ''));
+  const cropVarietyNameRaw = r.cropVariety?.name ?? '';
+  const cropVarietyName = escapeHtml(cropVarietyNameRaw);
+  const weatherCode = escapeHtml(String(r.weather?.code ?? ''));
+  const weatherNameRaw = r.weather?.japanese ?? '';
+  const weatherName = escapeHtml(weatherNameRaw);
+  const hoursRaw = r.workHours != null ? String(r.workHours) : '';
+  const hours = escapeHtml(hoursRaw);
+  const imageUrlRaw = r.imageURL ?? r.imageUrl ?? '';
+  const imageUrl = escapeHtml(imageUrlRaw);
+  const updatedAtRaw = workDate ? formatDateJa(workDate) : '';
+  const updatedAt = escapeHtml(updatedAtRaw || '—');
+  const text = escapeHtml([taskName, cropItemNameRaw, cropVarietyNameRaw, fieldRawName, userNameRaw, memoRaw, weatherNameRaw].filter(Boolean).join(' '));
+  const title = escapeHtml(memoRaw ? memoRaw.split(/\r?\n/)[0].trim().slice(0, 60) : defaultTitleForTask(taskName, fieldRawName));
+  const weatherBadge = escapeHtml(buildWeatherBadge(weatherCode, weatherNameRaw));
+  const hoursBadge = buildHoursBadge(hoursRaw);
 
   return `
-    <article class="report-card"
-      data-report
-      data-id="${escapeHtml(data.id)}"
-      data-report-id="${escapeHtml(data.id)}"
-      data-date="${date}"
-      data-task="${task}"
-      data-task-id="${escapeHtml(data.taskId)}"
-      data-owner="${ownerName}"
-      data-owner-id="${escapeHtml(data.ownerId)}"
-      data-field="${fieldName}"
-      data-field-id="${escapeHtml(data.fieldId)}"
-      data-title="${title}"
-      data-memo="${memo}"
-      data-time="${escapeHtml(data.time)}"
-      data-crop-item-id="${escapeHtml(data.cropItemId)}"
-      data-crop-item-name="${cropItemName}"
-      data-crop-variety-id="${escapeHtml(data.cropVarietyId)}"
-      data-crop-variety-name="${cropVarietyName}"
-      data-weather-code="${escapeHtml(data.weatherCode)}"
-      data-weather-name="${weatherName}"
-      data-image-url="${imageUrl}"
-      data-text="${text}">
-      <div class="report-thumb">
-        <img src="${imageUrl}" alt="${task || '作業'}の様子" onerror="this.onerror=null;this.src='/img/agri-login-bg.png';">
-      </div>
+    <article class="report-card" data-report data-report-id="${escapeHtml(String(r.id ?? ''))}" data-date="${date}" data-task="${task}" data-task-id="${taskId}" data-owner="${ownerName}" data-owner-id="${ownerId}" data-field="${fieldName}" data-field-id="${fieldId}" data-memo="${memo}" data-crop-item-id="${cropItemId}" data-crop-item-name="${cropItemName}" data-crop-variety-id="${cropVarietyId}" data-crop-variety-name="${cropVarietyName}" data-weather-code="${weatherCode}" data-weather-name="${weatherName}" data-hours="${hours}" data-time="${hoursRaw ? `${hoursRaw}h` : ''}" data-image-url="${imageUrl}" data-updated-at="${updatedAt}" data-text="${text}">
+      <div class="report-thumb">${imageUrlRaw ? `<img src="${imageUrl}" alt="${task}の様子">` : ''}</div>
       <div class="report-content">
-        <div class="report-meta">${escapeHtml(toJaMetaLine(data.date, data.field, data.owner))}</div>
+        <div class="report-meta">${escapeHtml(toJaMetaLine(workDate, fieldRawName, userNameRaw))}</div>
         <div class="report-title">${title}</div>
-        <div class="report-tags">${task ? `<span class="report-tag">${task}</span>` : '<span class="report-tag">—</span>'}</div>
+        <div class="report-tags"><span class="report-tag">${task}</span>${cropItemNameRaw ? `<span class="report-tag">${cropItemName}</span>` : ''}${cropVarietyNameRaw ? `<span class="report-tag">${cropVarietyName}</span>` : ''}</div>
         <div class="report-footer">
           <div class="report-footer-left">
-            <span class="badge-weather">⛅ ${weatherName}</span>
-            <span class="badge-worker">👨‍🌾 ${ownerName || '—'}</span>
+            <span class="badge-weather">${weatherBadge}</span>
           </div>
           <div class="report-footer-right">
-            <span class="badge-time">${timeBadge}</span>
-            <span class="badge-updated">作付：${cropVarietyName || cropItemName || '—'}</span>
+            <span class="badge-time">${hoursBadge}</span>
+            <span class="badge-updated">最終更新：${updatedAt}</span>
           </div>
         </div>
       </div>

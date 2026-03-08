@@ -1,21 +1,44 @@
-// Field list interactions
-// - filter/search/pagination (simple)
-// - field detail modal (click card)
-
 document.addEventListener('DOMContentLoaded', async () => {
   const grid = document.getElementById('fields-grid');
   if (!grid) return;
 
-  // role_id == 1 判定（owner-filter があるのは role1 のみ）
+  const userId = String(grid.dataset.userId || '');
   const isRole1 = !!document.getElementById('owner-filter');
 
-  // --- create modal elements ---
-  const createBtn = document.getElementById('field-create-button');
+  const loadingEl = document.getElementById('fields-loading');
+  const metaEl = document.getElementById('list-header-meta');
+  const emptyEl = document.getElementById('empty-message');
+  const ownerFilter = document.getElementById('owner-filter');
+  const typeFilter = document.getElementById('field-type-filter');
+  const statusFilter = document.getElementById('field-status-filter');
+  const prevBtn = document.getElementById('field-page-prev');
+  const nextBtn = document.getElementById('field-page-next');
+  const pageInfoEl = document.getElementById('field-page-info');
+
+  const backdrop = document.getElementById('field-detail-backdrop');
+  const modalCloseBtn = document.getElementById('field-detail-close');
+  const modalCancelBtn = document.getElementById('field-detail-cancel');
+  const modalEditBtn = document.getElementById('field-detail-edit');
+  const modalSaveBtn = document.getElementById('field-detail-save');
+  const titleEl = document.getElementById('field-detail-title');
+  const subtitleEl = document.getElementById('field-detail-subtitle');
+  const mapFrame = document.getElementById('field-map-frame');
+  const coordsEl = document.getElementById('field-map-coords');
+
+  const inputId = document.getElementById('detail-id');
+  const inputName = document.getElementById('detail-name');
+  const inputType = document.getElementById('detail-type');
+  const inputArea = document.getElementById('detail-area');
+  const inputStatus = document.getElementById('detail-status');
+  const inputOwner = document.getElementById('detail-owner');
+  const inputPostal = document.getElementById('detail-postal');
+  const inputAddress = document.getElementById('detail-address');
+
   const createBackdrop = document.getElementById('field-create-backdrop');
+  const createOpenBtn = document.getElementById('field-create-button');
   const createCloseBtn = document.getElementById('field-create-close');
   const createCancelBtn = document.getElementById('field-create-cancel');
   const createSaveBtn = document.getElementById('field-create-save');
-
   const createName = document.getElementById('create-name');
   const createCode = document.getElementById('create-code');
   const createArea = document.getElementById('create-area');
@@ -30,150 +53,275 @@ document.addEventListener('DOMContentLoaded', async () => {
   const createMapFrame = document.getElementById('field-create-map-frame');
   const createCoordsEl = document.getElementById('field-create-map-coords');
 
-  // --- modal elements ---
-  const backdrop = document.getElementById('field-detail-backdrop');
-  const modalCloseBtn = document.getElementById('field-detail-close');
-  const modalCancelBtn = document.getElementById('field-detail-cancel');
-  const modalEditBtn = document.getElementById('field-detail-edit');
-  const modalSaveBtn = document.getElementById('field-detail-save');
+  const hasModal = !!(backdrop && titleEl && inputName && inputType && inputStatus);
 
-  const titleEl = document.getElementById('field-detail-title');
-  const subtitleEl = document.getElementById('field-detail-subtitle');
-  const mapFrame = document.getElementById('field-map-frame');
-  const mapMarker = document.getElementById('field-map-marker');
-  const mapContainer = document.getElementById('field-map-container');
-  const coordsEl = document.getElementById('field-map-coords');
-  const workerChipsEl = document.getElementById('field-worker-chips');
+  let fields = [];
+  let filteredFields = [];
+  let fieldTypeMasters = [];
+  let fieldStateMasters = [];
+  let ownerMasters = [];
+  let currentFieldId = '';
+  let isEditing = false;
+  let lastPostalLookupKey = '';
+  let isAutoFillingAddress = false;
 
-  const inputId = document.getElementById('detail-id');
-  const inputName = document.getElementById('detail-name');
-  const inputCode = document.getElementById('detail-code');
-  const inputArea = document.getElementById('detail-area');
-  const inputType = document.getElementById('detail-type');
-  const inputStatus = document.getElementById('detail-status');
-  const inputOwner = document.getElementById('detail-owner');
-  const inputAddress = document.getElementById('detail-address');
-  const inputPostal = document.getElementById('detail-postal');
-  const inputUpdated = document.getElementById('detail-updated');
-  const inputNote = document.getElementById('detail-note');
+  try {
+    if (loadingEl) loadingEl.style.display = 'block';
 
-  // Safety: if modal not present, just don't do modal.
-  const hasModal = !!(backdrop && titleEl && inputName);
+    const [fieldList, typeMasters, stateMasters, owners] = await Promise.all([
+      fetchFields({ userId, isRole1 }),
+      fetchFieldTypes().catch(() => []),
+      fetchFieldStates().catch(() => []),
+      isRole1 ? fetchOwners().catch(() => []) : Promise.resolve([]),
+    ]);
 
-  // Demo worker map (id -> name)
-  const workerNameMap = {
-    '1': '田中（作業者）',
-    '2': '鈴木（作業者）',
-    '3': '佐藤（作業者）',
-  };
+    fields = Array.isArray(fieldList) ? fieldList.map(normalizeField) : [];
+    fieldTypeMasters = Array.isArray(typeMasters) ? typeMasters : [];
+    fieldStateMasters = Array.isArray(stateMasters) ? stateMasters : [];
+    ownerMasters = Array.isArray(owners) ? owners : [];
 
-  // --- filtering ---
-  const searchInput = document.getElementById('field-search');
-  const clearBtn = document.getElementById('field-search-clear');
-  const ownerFilter = document.getElementById('owner-filter');
-  const typeFilter = document.getElementById('field-type-filter');
-  const statusFilter = document.getElementById('field-status-filter');
-  const metaEl = document.getElementById('list-header-meta');
-  const emptyEl = document.getElementById('empty-message');
+    populateTypeFilter(typeFilter, fieldTypeMasters, fields);
+    populateStateFilter(statusFilter, fieldStateMasters, fields);
+    populateOwnerFilter(ownerFilter, fields, ownerMasters);
+    populateDetailSelect(inputType, fieldTypeMasters, 'type');
+    populateDetailSelect(inputStatus, fieldStateMasters, 'state');
+    populateDetailSelect(createType, fieldTypeMasters, 'type');
+    populateDetailSelect(createStatus, fieldStateMasters, 'state');
+    populateOwnerSelect(createOwner, ownerMasters);
 
-  let cards = Array.from(grid.querySelectorAll('[data-field]'));
-
-  // ダミーデータを廃止したため、カードが無ければGraphQLから取得
-  if (!cards.length) {
-    const loading = document.getElementById('fields-loading');
-    if (loading) loading.style.display = 'block';
-    try {
-      const fields = await fetchFields(grid);
-      grid.insertAdjacentHTML('beforeend', fields.map(toFieldCardHtml).join(''));
-      cards = Array.from(grid.querySelectorAll('[data-field]'));
-    } catch (e) {
-      console.error('圃場一覧の取得に失敗しました:', e);
-      if (metaEl) metaEl.textContent = '圃場一覧の取得に失敗しました';
-    } finally {
-      if (loading) loading.style.display = 'none';
-    }
+    filteredFields = fields.slice();
+    render();
+  } catch (err) {
+    console.error('圃場一覧の取得に失敗しました:', err);
+    fields = [];
+    filteredFields = [];
+    grid.innerHTML = '';
+    if (metaEl) metaEl.textContent = '0件表示';
+    if (emptyEl) emptyEl.style.display = '';
+  } finally {
+    if (loadingEl) loadingEl.style.display = 'none';
   }
 
-  function normalize(s) {
-    return String(s ?? '').toLowerCase();
-  }
-
-  function applyFilter() {
-    const q = normalize(searchInput?.value);
-    const owner = ownerFilter?.value || '';
-    const type = typeFilter?.value || '';
-    const status = statusFilter?.value || '';
-
-    let visible = 0;
-    for (const card of cards) {
-      const d = card.dataset;
-      const okOwner = !owner || d.owner === owner;
-      const okType = !type || d.type === type;
-      const okStatus = !status || d.status === status;
-      const okText = !q || normalize(d.text).includes(q);
-
-      const show = okOwner && okType && okStatus && okText;
-      card.style.display = show ? '' : 'none';
-      if (show) visible += 1;
-    }
-
-    if (metaEl) metaEl.textContent = `${visible}件表示`;
-    if (emptyEl) emptyEl.style.display = visible ? 'none' : '';
-  }
-
-  if (searchInput) {
-    searchInput.addEventListener('input', applyFilter);
-  }
-  if (clearBtn && searchInput) {
-    clearBtn.addEventListener('click', () => {
-      searchInput.value = '';
-      applyFilter();
-      searchInput.focus();
-    });
-  }
   ownerFilter?.addEventListener('change', applyFilter);
   typeFilter?.addEventListener('change', applyFilter);
   statusFilter?.addEventListener('change', applyFilter);
-  applyFilter();
+  prevBtn?.addEventListener('click', () => {});
+  nextBtn?.addEventListener('click', () => {});
 
-  // --- create modal helpers ---
-  const hasCreateModal = !!(createBackdrop && createName && createSaveBtn);
+  createOpenBtn?.addEventListener('click', openCreateModal);
+  createCloseBtn?.addEventListener('click', closeCreateModal);
+  createCancelBtn?.addEventListener('click', closeCreateModal);
+  createBackdrop?.addEventListener('click', (e) => {
+    if (e.target === createBackdrop) closeCreateModal();
+  });
+  createLat?.addEventListener('input', updateCreateMapFromInputs);
+  createLng?.addEventListener('input', updateCreateMapFromInputs);
+  createPostal?.addEventListener('blur', handlePostalLookup);
+  createPostal?.addEventListener('change', handlePostalLookup);
+  createAddress?.addEventListener('blur', handleAddressGeocode);
+  createSaveBtn?.addEventListener('click', handleCreateFieldSave);
+
+  grid.addEventListener('click', (e) => {
+    const card = e.target.closest('[data-field-id]');
+    if (!card) return;
+    const field = fields.find((x) => String(x.id) === String(card.dataset.fieldId));
+    if (!field) return;
+    openModal(field);
+  });
+
+  modalCloseBtn?.addEventListener('click', closeModal);
+  modalCancelBtn?.addEventListener('click', closeModal);
+  backdrop?.addEventListener('click', (e) => {
+    if (e.target === backdrop) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (backdrop?.classList.contains('open')) closeModal();
+    if (createBackdrop?.classList.contains('open')) closeCreateModal();
+  });
+
+  modalEditBtn?.addEventListener('click', () => {
+    setEditing(!isEditing);
+  });
+
+  modalSaveBtn?.addEventListener('click', () => {
+    const field = fields.find((x) => String(x.id) === String(currentFieldId));
+    if (!field) return;
+
+    field.name = inputName.value.trim();
+    field.area = inputArea ? String(inputArea.value || '').trim() : field.area;
+    field.fieldTypeID = inputType.value || '';
+    field.fieldTypeName = getTypeNameById(field.fieldTypeID) || inputType.options[inputType.selectedIndex]?.text || '';
+    field.fieldStateID = inputStatus.value || '';
+    field.fieldStateDescription = getStateDescriptionById(field.fieldStateID) || inputStatus.options[inputStatus.selectedIndex]?.text || '';
+    field.postalCode = inputPostal.value.trim();
+    field.address = inputAddress.value.trim();
+
+    render();
+    openModal(field);
+    setEditing(false);
+  });
+
+
+
+  async function handleCreateFieldSave() {
+    if (!createSaveBtn) return;
+
+    const payload = buildCreateFieldInput();
+    const validationError = validateCreateFieldInput(payload);
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
+
+    const originalLabel = createSaveBtn.textContent;
+    createSaveBtn.disabled = true;
+    createSaveBtn.textContent = '登録中...';
+
+    try {
+      const created = await createFieldMutation(payload);
+      const normalized = normalizeField(created || {});
+      if (normalized.id) {
+        fields.unshift(normalized);
+        applyFilter();
+      } else {
+        const reloaded = await fetchFields({ userId, isRole1 });
+        fields = Array.isArray(reloaded) ? reloaded.map(normalizeField) : [];
+        applyFilter();
+      }
+      closeCreateModal();
+      alert('圃場を登録しました。');
+    } catch (err) {
+      console.error('圃場登録に失敗しました:', err);
+      alert(err?.message || '圃場登録に失敗しました。');
+    } finally {
+      createSaveBtn.disabled = false;
+      createSaveBtn.textContent = originalLabel || '登録';
+    }
+  }
+
+  function buildCreateFieldInput() {
+    const lat = Number(String(createLat?.value || '').trim());
+    const lng = Number(String(createLng?.value || '').trim());
+    const area = Number(String(createArea?.value || '').trim());
+    const code = String(createCode?.value || '').trim();
+
+    const input = {
+      userID: String(createOwner?.value || '').trim(),
+      fieldTypeID: String(createType?.value || '').trim(),
+      fieldStateID: String(createStatus?.value || '').trim(),
+      name: String(createName?.value || '').trim(),
+      latitude: Number.isFinite(lat) ? lat : null,
+      longitude: Number.isFinite(lng) ? lng : null,
+      postalCode: String(createPostal?.value || '').trim(),
+      address: String(createAddress?.value || '').trim(),
+    };
+
+    if (code) input.fieldCode = code;
+    if (Number.isFinite(area)) input.area = area;
+
+    const note = String(createNote?.value || '').trim();
+    if (note) input.note = note;
+
+    return input;
+  }
+
+  function validateCreateFieldInput(input) {
+    if (!input.userID) return 'オーナーを選択してください。';
+    if (!input.fieldTypeID) return '種別を選択してください。';
+    if (!input.fieldStateID) return '状態を選択してください。';
+    if (!input.name) return '圃場名を入力してください。';
+    if (!Number.isFinite(input.latitude)) return '緯度を入力してください。';
+    if (!Number.isFinite(input.longitude)) return '経度を入力してください。';
+    if (!input.postalCode) return '郵便番号を入力してください。';
+    if (!input.address) return '住所を入力してください。';
+    return '';
+  }
+
+  async function handlePostalLookup() {
+    const raw = String(createPostal?.value || '');
+    const zipcode = raw.replace(/\D/g, '');
+    if (!createPostal) return;
+    const normalized = formatPostalCode(zipcode || raw);
+    if (normalized && createPostal.value !== normalized) createPostal.value = normalized;
+    if (zipcode.length !== 7) return;
+    if (lastPostalLookupKey === zipcode) return;
+    lastPostalLookupKey = zipcode;
+
+    try {
+      const result = await lookupPostalCode(zipcode);
+      const address = result?.address || '';
+      if (address && createAddress && !String(createAddress.value || '').trim()) {
+        isAutoFillingAddress = true;
+        createAddress.value = address;
+        isAutoFillingAddress = false;
+      }
+      if (address) await geocodeAddress(address);
+    } catch (err) {
+      console.warn('郵便番号から住所を取得できませんでした:', err);
+    }
+  }
+
+  async function handleAddressGeocode() {
+    if (isAutoFillingAddress) return;
+    const address = String(createAddress?.value || '').trim();
+    if (!address) return;
+    try {
+      await geocodeAddress(address);
+    } catch (err) {
+      console.warn('住所から緯度経度を取得できませんでした:', err);
+    }
+  }
+
+  async function geocodeAddress(address) {
+    if (!address) return null;
+    const geo = await fetchJson(`/field/api/geocode?address=${encodeURIComponent(address)}`);
+    if (geo?.lat != null && geo?.lng != null) {
+      if (createLat) createLat.value = String(geo.lat);
+      if (createLng) createLng.value = String(geo.lng);
+      updateCreateMap(geo.lat, geo.lng);
+      return geo;
+    }
+    return null;
+  }
 
   function openCreateModal() {
-    if (!hasCreateModal) return;
-    // reset
-    createName.value = '';
-    createCode.value = '';
-    createArea.value = '';
-    createType.value = 'paddy';
-    createStatus.value = 'active';
-    createOwner.value = '';
-    createAddress.value = '';
-    createPostal.value = '';
-    createLat.value = '';
-    createLng.value = '';
-    createNote.value = '';
-    updateCreateMap();
-
+    if (!createBackdrop) return;
+    resetCreateForm();
     createBackdrop.classList.add('open');
     createBackdrop.setAttribute('aria-hidden', 'false');
-    setTimeout(() => createName.focus(), 0);
   }
 
   function closeCreateModal() {
-    if (!hasCreateModal) return;
+    if (!createBackdrop) return;
     createBackdrop.classList.remove('open');
     createBackdrop.setAttribute('aria-hidden', 'true');
   }
 
-  function updateCreateMap() {
-    if (!hasCreateModal) return;
-    const lat = parseFloat(createLat.value);
-    const lng = parseFloat(createLng.value);
+  function resetCreateForm() {
+    if (createName) createName.value = '';
+    if (createCode) createCode.value = '';
+    if (createArea) createArea.value = '';
+    if (createAddress) createAddress.value = '';
+    if (createPostal) createPostal.value = '';
+    if (createLat) createLat.value = '';
+    if (createLng) createLng.value = '';
+    if (createNote) createNote.value = '';
+    if (createType && createType.options.length) createType.selectedIndex = 0;
+    if (createStatus && createStatus.options.length) createStatus.selectedIndex = 0;
+    if (createOwner && createOwner.options?.length) createOwner.selectedIndex = 0;
+    updateCreateMap(null, null);
+  }
+
+  function updateCreateMapFromInputs() {
+    updateCreateMap(createLat?.value, createLng?.value);
+  }
+
+  function updateCreateMap(latRaw, lngRaw) {
+    const lat = Number(latRaw);
+    const lng = Number(lngRaw);
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      if (createMapFrame) {
-        createMapFrame.src = `https://www.google.com/maps?q=${encodeURIComponent(lat + ',' + lng)}&z=16&output=embed`;
-      }
+      if (createMapFrame) createMapFrame.src = `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}&z=16&output=embed`;
       if (createCoordsEl) createCoordsEl.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
     } else {
       if (createMapFrame) createMapFrame.removeAttribute('src');
@@ -181,224 +329,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function formatNow() {
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
+  function applyFilter() {
+    const owner = String(ownerFilter?.value || '');
+    const type = String(typeFilter?.value || '');
+    const state = String(statusFilter?.value || '');
 
-  function nextId() {
-    let max = 0;
-    for (const c of cards) {
-      const id = parseInt(c.dataset.id, 10);
-      if (Number.isFinite(id)) max = Math.max(max, id);
-    }
-    return max + 1;
-  }
-
-  function pillStatusClass(status) {
-    if (status === 'active') return 'pill-status-active';
-    if (status === 'inactive') return 'pill-status-inactive';
-    if (status === 'abandoned') return 'pill-status-abandoned';
-    return 'pill-status-active';
-  }
-
-  function statusLabel2(status) {
-    return ({ active: '利用中', inactive: '一時休止', abandoned: '廃止' }[status]) || status;
-  }
-
-  function typeLabel2(type) {
-    return ({
-      paddy: '水田',
-      upland: '畑（畑地）',
-      vegetable: '野菜圃場',
-      fruit: '果樹園',
-      greenhouse: 'ハウス圃場',
-      other: 'その他',
-    }[type]) || type;
-  }
-
-  function numberWithCommas(x) {
-    const n = Number(x);
-    if (!Number.isFinite(n)) return '-';
-    return n.toLocaleString('ja-JP');
-  }
-
-  function buildCard(data) {
-    const el = document.createElement('article');
-    el.className = 'field-card';
-    el.setAttribute('data-field', '');
-
-    // dataset (detail modal uses these)
-    el.dataset.id = String(data.id);
-    el.dataset.name = data.name;
-    el.dataset.code = data.code;
-    el.dataset.owner = data.owner;
-    el.dataset.type = data.type;
-    el.dataset.status = data.status;
-    el.dataset.lat = String(data.lat ?? '');
-    el.dataset.lng = String(data.lng ?? '');
-    el.dataset.area = String(data.area ?? '');
-    el.dataset.postal = data.postal;
-    el.dataset.address = data.address;
-    el.dataset.note = data.note;
-    el.dataset.updatedAt = data.updatedAt;
-    el.dataset.createdAt = data.createdAt;
-    el.dataset.workerIds = data.workerIds;
-    el.dataset.text = `${data.name} ${data.owner} ${typeLabel2(data.type)} ${data.address} ${data.code} ${statusLabel2(data.status)}`;
-
-    const ownerPill = (isRole1 && data.owner)
-      ? `<span class="pill">${escapeHtml(data.owner)}</span>`
-      : '';
-
-    el.innerHTML = `
-      <div class="field-card-header">
-        <div>
-          <div class="field-name">${escapeHtml(data.name)}</div>
-          <div class="field-code">コード: ${escapeHtml(data.code)}</div>
-        </div>
-      </div>
-      <div class="field-pill-row">
-        <span class="pill pill-type">${escapeHtml(typeLabel2(data.type))}</span>
-        <span class="pill ${pillStatusClass(data.status)}">${escapeHtml(statusLabel2(data.status))}</span>
-        ${ownerPill}
-      </div>
-      <div class="field-meta-row">
-        <span>📍 <span class="field-address">${escapeHtml(data.address || '-')}</span></span>
-        <span>📐 面積: ${numberWithCommas(data.area)} ㎡</span>
-        <span>👥 <span class="field-workers-label">作業者: 未登録</span></span>
-      </div>
-      <div class="field-update">最終更新: ${escapeHtml(data.updatedAt)}</div>
-    `;
-    return el;
-  }
-
-  function escapeHtml(str) {
-    return String(str ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
-
-  if (hasCreateModal && createBtn) {
-    createBtn.addEventListener('click', openCreateModal);
-  }
-
-  createCloseBtn?.addEventListener('click', closeCreateModal);
-  createCancelBtn?.addEventListener('click', closeCreateModal);
-  createBackdrop?.addEventListener('click', (e) => {
-    if (e.target === createBackdrop) closeCreateModal();
-  });
-
-  createLat?.addEventListener('input', updateCreateMap);
-  createLng?.addEventListener('input', updateCreateMap);
-
-  createSaveBtn?.addEventListener('click', () => {
-    if (!hasCreateModal) return;
-    const name = createName.value.trim();
-    if (!name) {
-      // eslint-disable-next-line no-alert
-      alert('圃場名を入力してください');
-      createName.focus();
-      return;
-    }
-
-    const id = nextId();
-    const code = (createCode.value.trim() || `F-${String(id).padStart(3, '0')}`);
-    const area = createArea.value ? Number(createArea.value) : '';
-    const type = createType.value;
-    const status = createStatus.value;
-    const owner = createOwner.value.trim() || (isRole1 ? '未設定' : '');
-    const address = createAddress.value.trim();
-    const postal = createPostal.value.trim();
-    const lat = createLat.value ? Number(createLat.value) : '';
-    const lng = createLng.value ? Number(createLng.value) : '';
-    const note = createNote.value.trim();
-
-    const now = formatNow();
-    const card = buildCard({
-      id,
-      name,
-      code,
-      owner,
-      type,
-      status,
-      lat,
-      lng,
-      area,
-      postal,
-      address,
-      note,
-      updatedAt: now,
-      createdAt: now,
-      workerIds: '',
+    filteredFields = fields.filter((field) => {
+      const okOwner = !owner || String(field.ownerID) === owner;
+      const okType = !type || String(field.fieldTypeID) === type;
+      const okState = !state || String(field.fieldStateID) === state;
+      return okOwner && okType && okState;
     });
-
-    // add to DOM and list
-    grid.insertBefore(card, grid.firstChild);
-    cards.unshift(card);
-    applyFilter();
-    closeCreateModal();
-  });
-
-  // --- field detail modal ---
-  if (!hasModal) return;
-
-  let isEditing = false;
-  let currentLat = null;
-  let currentLng = null;
-
-  const editableInputs = [
-    inputName,
-    inputArea,
-    inputType,
-    inputStatus,
-    inputOwner,
-    inputAddress,
-    inputPostal,
-    inputNote,
-  ].filter(Boolean);
-
-  function setEditing(next) {
-    isEditing = next;
-    for (const el of editableInputs) {
-      el.disabled = !next;
-    }
-    // code/id/updated are always read-only
-    inputCode && (inputCode.disabled = true);
-    inputUpdated && (inputUpdated.disabled = true);
-    modalSaveBtn.style.display = next ? '' : 'none';
-    modalEditBtn.textContent = next ? '編集終了' : '編集';
-    mapMarker.classList.toggle('disabled', !next);
+    render();
   }
 
-  function openModalFromCard(card) {
-    const d = card.dataset;
-    inputId.value = d.id || '';
-    inputName.value = d.name || '';
-    inputCode.value = d.code || '';
-    inputArea.value = d.area || '';
-    inputType.value = typeLabel(d.type);
-    inputStatus.value = statusLabel(d.status);
-    inputOwner.value = d.owner || '';
-    inputAddress.value = d.address || '';
-    inputPostal.value = d.postal || '';
-    inputUpdated.value = d.updatedAt || '';
-    inputNote.value = d.note || '';
+  function render() {
+    grid.innerHTML = filteredFields.map(toFieldCardHtml).join('');
+    if (metaEl) metaEl.textContent = `${filteredFields.length}件表示`;
+    if (pageInfoEl) pageInfoEl.textContent = '1 / 1ページ';
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    if (emptyEl) emptyEl.style.display = filteredFields.length ? 'none' : '';
+  }
 
-    titleEl.textContent = d.name || '圃場詳細';
-    subtitleEl.textContent = `コード: ${d.code || '-'}`;
+  function openModal(field) {
+    if (!hasModal) return;
+    currentFieldId = field.id;
+    titleEl.textContent = field.name || '圃場詳細';
+    subtitleEl.textContent = '';
+    inputId.value = field.id || '';
+    inputName.value = field.name || '';
+    if (inputArea) inputArea.value = field.area != null && field.area !== '' ? String(field.area) : '';
+    inputOwner.value = field.ownerName || '';
+    inputPostal.value = field.postalCode || '';
+    inputAddress.value = field.address || '';
 
-    currentLat = parseFloat(d.lat);
-    currentLng = parseFloat(d.lng);
-    if (!Number.isFinite(currentLat)) currentLat = null;
-    if (!Number.isFinite(currentLng)) currentLng = null;
+    setSelectValue(inputType, String(field.fieldTypeID || ''));
+    setSelectValue(inputStatus, String(field.fieldStateID || ''));
 
-    updateMap();
-    renderWorkers(d.workerIds);
-
+    updateMap(field.latitude, field.longitude);
     setEditing(false);
     backdrop.classList.add('open');
     backdrop.setAttribute('aria-hidden', 'false');
@@ -410,260 +379,334 @@ document.addEventListener('DOMContentLoaded', async () => {
     setEditing(false);
   }
 
-  function updateMap() {
-    const lat = currentLat;
-    const lng = currentLng;
+  function setEditing(next) {
+    isEditing = !!next;
+    if (inputName) inputName.disabled = !isEditing;
+    if (inputType) inputType.disabled = !isEditing;
+    if (inputArea) inputArea.disabled = !isEditing;
+    if (inputStatus) inputStatus.disabled = !isEditing;
+    if (inputPostal) inputPostal.disabled = !isEditing;
+    if (inputAddress) inputAddress.disabled = !isEditing;
+    if (inputOwner) inputOwner.disabled = true;
+    if (modalSaveBtn) modalSaveBtn.style.display = isEditing ? '' : 'none';
+    if (modalEditBtn) modalEditBtn.textContent = isEditing ? '編集終了' : '編集';
+  }
+
+  function updateMap(latRaw, lngRaw) {
+    const lat = Number(latRaw);
+    const lng = Number(lngRaw);
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      // no-key embed
-      mapFrame.src = `https://www.google.com/maps?q=${encodeURIComponent(lat + ',' + lng)}&z=16&output=embed`;
-      coordsEl.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
+      if (mapFrame) mapFrame.src = `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}&z=16&output=embed`;
+      if (coordsEl) coordsEl.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
     } else {
-      mapFrame.removeAttribute('src');
-      coordsEl.textContent = 'lat: -, lng: -';
+      if (mapFrame) mapFrame.removeAttribute('src');
+      if (coordsEl) coordsEl.textContent = 'lat: -, lng: -';
     }
   }
 
-  function renderWorkers(workerIdsRaw) {
-    const ids = String(workerIdsRaw || '')
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    workerChipsEl.innerHTML = '';
-    if (!ids.length) {
-      workerChipsEl.innerHTML = '<span class="worker-chip">未登録</span>';
-      return;
-    }
-    for (const id of ids) {
-      const chip = document.createElement('span');
-      chip.className = 'worker-chip';
-      chip.textContent = workerNameMap[id] || `ID:${id}`;
-      workerChipsEl.appendChild(chip);
-    }
+  function getTypeNameById(id) {
+    return fieldTypeMasters.find((x) => String(x.id) === String(id))?.name || '';
   }
 
-  function typeLabel(v) {
-    const map = {
-      paddy: '水田',
-      upland: '畑（畑地）',
-      vegetable: '野菜圃場',
-      fruit: '果樹園',
-      greenhouse: 'ハウス圃場',
-      other: 'その他',
-    };
-    return map[v] || (v || '');
+  function getStateDescriptionById(id) {
+    const state = fieldStateMasters.find((x) => String(x.id) === String(id));
+    return state?.description || state?.name || '';
   }
-  function statusLabel(v) {
-    const map = {
-      active: '利用中',
-      inactive: '一時休止',
-      abandoned: '廃止',
-    };
-    return map[v] || (v || '');
-  }
-
-  // Card click -> open modal
-  grid.addEventListener('click', (e) => {
-    const card = e.target.closest('[data-field]');
-    if (!card) return;
-
-    // ignore clicks when user is selecting text
-    const sel = window.getSelection?.();
-    if (sel && String(sel).length > 0) return;
-
-    openModalFromCard(card);
-  });
-
-  modalCloseBtn?.addEventListener('click', closeModal);
-  modalCancelBtn?.addEventListener('click', closeModal);
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) closeModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    if (createBackdrop && createBackdrop.classList.contains('open')) closeCreateModal();
-    if (backdrop.classList.contains('open')) closeModal();
-  });
-
-  modalEditBtn?.addEventListener('click', () => {
-    setEditing(!isEditing);
-  });
-  modalSaveBtn?.addEventListener('click', () => {
-    // Demo: no backend yet
-    // Sync coordinates into the note for visibility if changed
-    if (Number.isFinite(currentLat) && Number.isFinite(currentLng)) {
-      coordsEl.textContent = `lat: ${currentLat.toFixed(6)}, lng: ${currentLng.toFixed(6)}`;
-    }
-    setEditing(false);
-    // eslint-disable-next-line no-alert
-    alert('保存はデモです（バックエンド連携は次フェーズ）');
-  });
-
-  // --- marker drag (demo) ---
-  // Move marker within the map container and update lat/lng slightly.
-  // (This is a UI demo; in production you'd pick coords from real map click.)
-  let dragging = false;
-  let startX = 0;
-  let startY = 0;
-  let markerStartLeft = 0;
-  let markerStartTop = 0;
-
-  function px(n) { return `${n}px`; }
-
-  function getPos(el) {
-    const r = el.getBoundingClientRect();
-    return { w: r.width, h: r.height };
-  }
-
-  function setMarkerPos(x, y) {
-    mapMarker.style.left = px(x);
-    mapMarker.style.top = px(y);
-    mapMarker.style.transform = 'translate(-50%, -50%)';
-  }
-
-  function ensureMarkerCentered() {
-    // reset to center (CSS default) when opening
-    mapMarker.style.left = '50%';
-    mapMarker.style.top = '50%';
-    mapMarker.style.transform = 'translate(-50%, -50%)';
-  }
-
-  // Reset marker when modal opens
-  const observer = new MutationObserver(() => {
-    if (backdrop.classList.contains('open')) {
-      ensureMarkerCentered();
-    }
-  });
-  observer.observe(backdrop, { attributes: true, attributeFilter: ['class'] });
-
-  mapMarker.addEventListener('mousedown', (e) => {
-    if (!isEditing) return;
-    dragging = true;
-    mapMarker.style.cursor = 'grabbing';
-
-    const rect = mapContainer.getBoundingClientRect();
-    const markerRect = mapMarker.getBoundingClientRect();
-    startX = e.clientX;
-    startY = e.clientY;
-    markerStartLeft = markerRect.left - rect.left + markerRect.width / 2;
-    markerStartTop = markerRect.top - rect.top + markerRect.height / 2;
-    e.preventDefault();
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (!dragging) return;
-    const rect = mapContainer.getBoundingClientRect();
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    const x = clamp(markerStartLeft + dx, 8, rect.width - 8);
-    const y = clamp(markerStartTop + dy, 8, rect.height - 8);
-    setMarkerPos(x, y);
-
-    // Update coords a little (demo)
-    if (Number.isFinite(currentLat) && Number.isFinite(currentLng)) {
-      currentLat = currentLat + (-dy * 0.00001);
-      currentLng = currentLng + (dx * 0.00001);
-      coordsEl.textContent = `lat: ${currentLat.toFixed(6)}, lng: ${currentLng.toFixed(6)}`;
-    }
-  });
-
-  window.addEventListener('mouseup', () => {
-    if (!dragging) return;
-    dragging = false;
-    mapMarker.style.cursor = 'grab';
-  });
 });
 
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v));
+function formatPostalCode(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 7);
+  if (digits.length <= 3) return digits;
+  return `${digits.slice(0, 3)}-${digits.slice(3)}`;
 }
 
-// -----------------------------
-// GraphQL: 圃場一覧取得（ダミー廃止に伴う実データ表示）
-// -----------------------------
-async function fetchFields(gridEl) {
-  const userId = gridEl?.dataset?.userId;
-  if (!userId) return [];
+async function fetchJson(url) {
+  const res = await fetch(url, { headers: { accept: 'application/json' } });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json?.error) throw new Error(json?.error || `HTTP ${res.status}`);
+  return json;
+}
 
-  const q = `
-    query FindFieldsByUser($userId: Int!) {
-      findFieldsByUser(userId: $userId) {
+async function lookupPostalCode(zipcode) {
+  return fetchJson(`/field/api/postal-lookup?zipcode=${encodeURIComponent(zipcode)}`);
+}
+
+function normalizeField(f) {
+  const owner = f.user || {};
+  return {
+    id: f.id ?? '',
+    name: f.name ?? '',
+    fieldCode: f.fieldCode ?? '',
+    latitude: f.latitude,
+    longitude: f.longitude,
+    area: f.area,
+    postalCode: f.postalCode ?? '',
+    address: f.address ?? '',
+    note: f.note ?? '',
+    updatedAt: f.updatedAt ?? '',
+    ownerID: owner.id ?? '',
+    ownerName: owner.farmName || fullName(owner) || owner.email || '',
+    fieldTypeID: f.fieldType?.id ?? '',
+    fieldTypeName: f.fieldType?.name ?? '',
+    fieldStateID: f.fieldState?.id ?? '',
+    fieldStateDescription: f.fieldState?.description || f.fieldState?.name || '',
+  };
+}
+
+function fullName(user) {
+  const name = [user?.lastName, user?.firstName].filter(Boolean).join(' ');
+  return name || '';
+}
+
+function esc(s) {
+  return String(s ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function toFieldCardHtml(field) {
+  return `
+    <article class="field-card" data-field-id="${esc(field.id)}">
+      <div class="field-card-header">
+        <div class="field-name-wrap">
+          <div class="field-name-row">
+            <div class="field-name">${esc(field.name || '（名称なし）')}</div>
+            ${field.area != null && field.area !== '' ? `<div class="field-area-inline">面積：${esc(field.area)}㎡</div>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="field-pill-row">
+        ${field.fieldTypeName ? `<span class="pill pill-type">${esc(field.fieldTypeName)}</span>` : ''}
+        ${field.fieldStateDescription ? `<span class="pill pill-status-active">${esc(field.fieldStateDescription)}</span>` : ''}
+        ${field.ownerName ? `<span class="pill">${esc(field.ownerName)}</span>` : ''}
+      </div>
+      <div class="field-meta-row">
+        <div class="field-meta-left">
+          <div class="field-address">${esc(field.address || '')}</div>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function populateOwnerFilter(selectEl, fields, owners) {
+  if (!selectEl) return;
+  const current = String(selectEl.value || '');
+  const list = (Array.isArray(owners) && owners.length)
+    ? owners.map((x) => ({ id: String(x.id || ''), name: x.name || '' })).filter((x) => x.id && x.name)
+    : Array.from(new Map(fields.filter((x) => x.ownerID).map((x) => [String(x.ownerID), x.ownerName || ''])).entries()).map(([id, name]) => ({ id, name }));
+  selectEl.innerHTML = '<option value="">すべてのオーナー</option>' + list.map((x) => `<option value="${esc(x.id)}">${esc(x.name || x.id)}</option>`).join('');
+  if (list.some((x) => x.id === current)) selectEl.value = current;
+}
+
+function populateOwnerSelect(selectEl, owners) {
+  if (!selectEl) return;
+  const current = String(selectEl.value || '');
+  const list = Array.isArray(owners) ? owners.filter((x) => x?.id && x?.name) : [];
+  selectEl.innerHTML = '<option value="">選択してください</option>' + list.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('');
+  if (list.some((x) => String(x.id) === current)) selectEl.value = current;
+}
+
+function populateTypeFilter(selectEl, masters, fields) {
+  if (!selectEl) return;
+  const current = selectEl.value;
+  const source = masters.length ? masters.map((x) => ({ id: x.id, label: x.name })) : uniqBy(fields.filter((x) => x.fieldTypeID), (x) => String(x.fieldTypeID)).map((x) => ({ id: x.fieldTypeID, label: x.fieldTypeName }));
+  selectEl.innerHTML = '<option value="">すべての種別</option>' + source.map((x) => `<option value="${esc(x.id)}">${esc(x.label)}</option>`).join('');
+  if (source.some((x) => String(x.id) === current)) selectEl.value = current;
+}
+
+function populateStateFilter(selectEl, masters, fields) {
+  if (!selectEl) return;
+  const current = selectEl.value;
+  const source = masters.length ? masters.map((x) => ({ id: x.id, label: x.description || x.name })) : uniqBy(fields.filter((x) => x.fieldStateID), (x) => String(x.fieldStateID)).map((x) => ({ id: x.fieldStateID, label: x.fieldStateDescription }));
+  selectEl.innerHTML = '<option value="">すべての状態</option>' + source.map((x) => `<option value="${esc(x.id)}">${esc(x.label)}</option>`).join('');
+  if (source.some((x) => String(x.id) === current)) selectEl.value = current;
+}
+
+function populateDetailSelect(selectEl, masters, kind) {
+  if (!selectEl) return;
+  const current = selectEl.value;
+  let options = [];
+  if (kind === 'type') {
+    options = masters.map((x) => ({ id: x.id, label: x.name }));
+  } else {
+    options = masters.map((x) => ({ id: x.id, label: x.description || x.name }));
+  }
+  if (!options.length) return;
+  selectEl.innerHTML = options.map((x) => `<option value="${esc(x.id)}">${esc(x.label)}</option>`).join('');
+  if (options.some((x) => String(x.id) === current)) selectEl.value = current;
+}
+
+function setSelectValue(selectEl, value) {
+  if (!selectEl) return;
+  const exists = Array.from(selectEl.options).some((opt) => String(opt.value) === String(value));
+  if (exists) {
+    selectEl.value = String(value);
+  }
+}
+
+function uniqBy(arr, keyFn) {
+  const map = new Map();
+  for (const item of arr) map.set(keyFn(item), item);
+  return Array.from(map.values());
+}
+
+async function gqlPost(query, variables = {}) {
+  const res = await fetch('/graphql', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  });
+  const json = await res.json();
+  if (!res.ok || json?.errors?.length) {
+    throw new Error(json?.errors?.[0]?.message || `HTTP ${res.status}`);
+  }
+  return json.data || {};
+}
+
+async function fetchFields({ userId, isRole1 }) {
+  const query = `
+    query FindFields($ownerID: ID) {
+      findFields(ownerID: $ownerID) {
         id
-        name
         fieldCode
+        name
         latitude
         longitude
         area
         postalCode
         address
         note
-        fieldType { id name }
+        user {
+          id
+          farmName
+          firstName
+          lastName
+          email
+        }
+        fieldType {
+          id
+          name
+        }
+        fieldState {
+          id
+          name
+          description
+        }
+      }
+    }
+  `;
+  const variables = {};
+  if (!isRole1 && userId) variables.ownerID = String(userId);
+  const data = await gqlPost(query, variables);
+  return data.findFields || [];
+}
+
+async function fetchOwners() {
+  const query = `
+    query FindUsersForOwnerFilter($roleID: ID!) {
+      findUsers(roleID: $roleID) {
+        id
+        farmName
+        firstName
+        lastName
+        email
+      }
+    }
+  `;
+  const data = await gqlPost(query, { roleID: '2' });
+  const list = Array.isArray(data.findUsers) ? data.findUsers : [];
+  return list
+    .map((u) => ({
+      id: String(u?.id || '').trim(),
+      name: String(u?.farmName || '').trim(),
+    }))
+    .filter((u) => u.id && u.name)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+}
+
+async function fetchFieldTypes() {
+  const query = `
+    query FieldTypes {
+      fieldTypes {
+        id
+        name
+        sortOrder
+      }
+    }
+  `;
+  const data = await gqlPost(query, {});
+  return data.fieldTypes || [];
+}
+
+async function fetchFieldStates() {
+  const query = `
+    query FieldStates {
+      fieldStates {
+        id
+        name
+        description
+      }
+    }
+  `;
+  const data = await gqlPost(query, {});
+  return data.fieldStates || [];
+}
+
+
+async function createFieldMutation(input) {
+  const query = `
+    mutation CreateField($input: CreateFieldInput!) {
+      createField(input: $input) {
+        id
+        fieldCode
+        name
+        latitude
+        longitude
+        area
+        postalCode
+        address
+        note
+        user {
+          id
+          farmName
+          firstName
+          lastName
+          email
+        }
+        fieldType {
+          id
+          name
+        }
+        fieldState {
+          id
+          name
+          description
+        }
       }
     }
   `;
 
-  const res = await fetch('/graphql', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ query: q, variables: { userId: Number(userId) } }),
-  });
+  const variables = {
+    input: {
+      userID: String(input.userID),
+      fieldTypeID: String(input.fieldTypeID),
+      fieldStateID: String(input.fieldStateID),
+      name: String(input.name),
+      latitude: Number(input.latitude),
+      longitude: Number(input.longitude),
+      postalCode: String(input.postalCode),
+      address: String(input.address),
+    }
+  };
 
-  const json = await res.json();
-  if (json?.errors?.length) {
-    throw new Error(json.errors[0]?.message || 'GraphQL error');
-  }
-  return json?.data?.findFieldsByUser || [];
-}
+  if (input.fieldCode) variables.input.fieldCode = String(input.fieldCode);
+  if (Number.isFinite(input.area)) variables.input.area = Number(input.area);
+  if (input.note) variables.input.note = String(input.note);
 
-function toFieldCardHtml(f) {
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const id = esc(f.id);
-  const name = esc(f.name);
-  const code = esc(f.fieldCode);
-  const area = (Number.isFinite(Number(f.area)) ? Number(f.area).toFixed(2) : '');
-  const lat = esc(f.latitude);
-  const lng = esc(f.longitude);
-  const postal = esc(f.postalCode);
-  const address = esc(f.address);
-  const note = esc(f.note);
-  const typeName = esc(f.fieldType?.name || f.fieldType?.id || '');
-
-  const text = esc([name, code, typeName, address].filter(Boolean).join(' '));
-
-  return `
-    <article
-      class="field-card"
-      data-field
-      data-id="${id}"
-      data-name="${name}"
-      data-code="${code}"
-      data-type="${typeName}"
-      data-status="active"
-      data-lat="${lat}"
-      data-lng="${lng}"
-      data-area="${area}"
-      data-postal="${postal}"
-      data-address="${address}"
-      data-note="${note}"
-      data-text="${text}"
-    >
-      <div class="field-card-header">
-        <div>
-          <div class="field-name">${name || '（名称なし）'}</div>
-          <div class="field-code">コード: ${code || '-'}</div>
-        </div>
-      </div>
-      <div class="field-pill-row">
-        ${typeName ? `<span class="pill pill-type">${typeName}</span>` : ''}
-        <span class="pill pill-status-active">利用中</span>
-      </div>
-      <div class="field-meta-row">
-        <div class="field-meta-left">
-          <div class="field-address">${address || ''}</div>
-          <div class="field-meta">面積: ${area ? area + '㎡' : '-'} </div>
-        </div>
-        <div class="field-actions"><span class="action-chip">詳細</span></div>
-      </div>
-    </article>
-  `;
+  const data = await gqlPost(query, variables);
+  return data.createField || null;
 }

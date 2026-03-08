@@ -157,6 +157,8 @@
     // Password submit
     const passwordForm = qs('#password-form');
     const passwordMsg = qs('#password-message');
+    const PASSWORD_REGEX = /^[A-Za-z0-9!.\-=_#@<>]{8,20}$/;
+    const PASSWORD_HELP = '8文字以上20文字以下の半角英数字で入力してください。記号は !.-=_#@<> が使用できます。';
     if (passwordForm) {
       passwordForm.addEventListener('submit', async function (e) {
         e.preventDefault();
@@ -168,12 +170,12 @@
           setMessage(passwordMsg, 'パスワードを入力してください', 'error');
           return;
         }
-        if (password !== passwordConfirm) {
-          setMessage(passwordMsg, 'パスワードが一致しません', 'error');
+        if (!PASSWORD_REGEX.test(password)) {
+          setMessage(passwordMsg, PASSWORD_HELP, 'error');
           return;
         }
-        if (password.length < 8) {
-          setMessage(passwordMsg, 'パスワードは8文字以上を推奨します', 'error');
+        if (password !== passwordConfirm) {
+          setMessage(passwordMsg, 'パスワードが一致しません', 'error');
           return;
         }
         try {

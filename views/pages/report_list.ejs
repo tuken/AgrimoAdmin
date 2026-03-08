@@ -96,9 +96,9 @@
           </div>
 
           <footer class="calendar-footer">
-            <button class="calendar-filter active" id="filter-all" type="button">
+            <!-- <button class="calendar-filter active" id="filter-all" type="button">
               <span>すべての日報を表示</span>
-            </button>
+            </button> -->
             <div class="calendar-legend">
               <span class="legend-dot"></span>
               <span>日報のある日</span>
@@ -110,9 +110,9 @@
         <section class="reports-card">
           <header class="reports-header">
             <div class="reports-header-left">
-              <div class="reports-title" id="list-header-title">日報一覧（すべて）</div>
+              <div class="reports-title" id="list-header-title">日報一覧</div>
               <div class="reports-meta" id="list-header-meta">
-                今日を含む最近の作業が新しい順に表示されます。
+                当月の最近の作業が新しい順に表示されます。
               </div>
             </div>
             <div class="reports-header-right">
@@ -136,8 +136,7 @@
                   <div class="task-select-wrapper">
                     <select id="owner-filter">
                       <option value="">すべてのオーナー</option>
-                      <option value="高橋アグリサービス">高橋アグリサービス</option>
-                      <option value="佐藤農園">佐藤農園</option>
+                      
                     </select>
                   </div>
                 <% } %>
@@ -145,7 +144,7 @@
                   <select id="field-filter">
                     <option value="">すべての圃場</option>
                     <% ((user && user.fields) ? user.fields : []).forEach((f) => { %>
-                      <option value="<%= f.id %>" data-label="<%= f.name %>"><%= f.name %></option>
+                      <option value="<%= f.id %>"><%= f.name %></option>
                     <% }) %>
                   </select>
                 </div>
@@ -153,7 +152,7 @@
                   <select id="task-filter">
                     <option value="">すべての作業</option>
                     <% (workTypes || []).slice().sort((a,b) => Number(a.id) - Number(b.id)).forEach((t) => { %>
-                      <option value="<%= t.id %>" data-label="<%= t.name %>"><%= t.name %></option>
+                      <option value="<%= t.name %>"><%= t.name %></option>
                     <% }) %>
                   </select>
                 </div>
@@ -235,6 +234,11 @@
           </div>
 
           <div class="detail-form-group">
+            <label class="detail-label" for="detail-crop-variety">品種</label>
+            <input id="detail-crop-variety" class="detail-input" type="text" disabled>
+          </div>
+
+          <div class="detail-form-group">
             <label class="detail-label" for="detail-owner">担当者</label>
             <input id="detail-owner" class="detail-input" type="text" disabled>
           </div>
@@ -291,6 +295,14 @@
         <% } %>
       </div>
     </footer>
+  </div>
+</div>
+
+<!-- 画像拡大モーダル -->
+<div class="modal-backdrop image-viewer-backdrop" id="image-viewer-backdrop" aria-hidden="true">
+  <div class="image-viewer-modal" role="dialog" aria-modal="true" aria-label="画像拡大表示">
+    <button class="image-viewer-close" type="button" data-modal-close aria-label="閉じる">×</button>
+    <img id="image-viewer-image" src="" alt="拡大画像">
   </div>
 </div>
 

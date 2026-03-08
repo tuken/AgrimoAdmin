@@ -3,6 +3,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const userList = document.getElementById('user-list');
   if (!userList) return;
 
+  const currentUserId = String(userList.dataset.currentUserId || '').trim();
+  const currentRoleId = Number(userList.dataset.currentRoleId || 0);
+  const isAdminUser = currentRoleId === 1;
+  const isOwnerUser = currentRoleId === 2;
+
   // ---------- Helpers ----------
   const qs = (sel, root = document) => root.querySelector(sel);
   const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -35,6 +40,203 @@ document.addEventListener('DOMContentLoaded', () => {
     backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) closeFn();
     });
+  }
+
+
+
+  // ---------- GraphQL users ----------
+  function formatDateTime(v) {
+    if (!v) return '-';
+    const s = String(v).trim();
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    return s.replace('T', ' ').replace(/:\d{2}(?:\.\d+)?Z?$/, '');
+  }
+
+  function getDisplayName(user) {
+    const full = `${String(user?.lastName || '').trim()} ${String(user?.firstName || '').trim()}`.trim();
+    return full || String(user?.farmName || '').trim() || String(user?.email || '').trim() || `User ${String(user?.id || '').trim()}`;
+  }
+
+  function normalizeGender(v) {
+    const s = String(v ?? '').trim().toLowerCase();
+    if (!s) return '';
+    if (['male', 'man', 'm', '男性', '男'].includes(s)) return 'male';
+    if (['female', 'woman', 'f', '女性', '女'].includes(s)) return 'female';
+    if (['other', 'others', 'その他'].includes(s)) return 'other';
+    if (['unknown', 'none', '未回答', '未設定', '回答しない'].includes(s)) return 'unknown';
+    return s;
+  }
+
+  function normalizeDateOnly(v) {
+    if (!v) return '';
+    const s = String(v).trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+
+  function clearUserSections() {
+    qsa('.worker-card', userList).forEach((el) => el.remove());
+  }
+
+
+  function normalizeZipcode(v) {
+    return String(v ?? '').replace(/[^\d]/g, '').slice(0, 7);
+  }
+
+  async function lookupAddressByZipcode(zipcode) {
+    const normalized = normalizeZipcode(zipcode);
+    if (normalized.length !== 7) return null;
+
+    const url = `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${encodeURIComponent(normalized)}`;
+    const res = await fetch(url, { method: 'GET' });
+    if (!res.ok) throw new Error(`郵便番号検索に失敗しました: ${res.status}`);
+    const json = await res.json();
+    if (json?.status !== 200 || !Array.isArray(json?.results) || !json.results.length) return null;
+
+    const first = json.results[0] || {};
+    return `${String(first.address1 || '')}${String(first.address2 || '')}${String(first.address3 || '')}`.trim();
+  }
+
+  function bindZipcodeAutoFill(zipInput, addressInput) {
+    if (!zipInput || !addressInput) return;
+
+    let lastRequestedZip = '';
+
+    const execute = async () => {
+      const normalized = normalizeZipcode(zipInput.value);
+      if (normalized.length !== 7) return;
+      if (lastRequestedZip === normalized) return;
+      lastRequestedZip = normalized;
+
+      const currentAddress = String(addressInput.value || '').trim();
+      const autoFilledZip = addressInput.dataset.autoFilledZip || '';
+      const shouldOverwrite = !currentAddress || autoFilledZip === normalized || autoFilledZip === normalizeZipcode(zipInput.dataset.prevZip || '');
+      if (!shouldOverwrite && currentAddress) return;
+
+      try {
+        const address = await lookupAddressByZipcode(normalized);
+        if (!address) return;
+        addressInput.value = address;
+        addressInput.dataset.autoFilledZip = normalized;
+      } catch (err) {
+        console.error('郵便番号から住所を取得できませんでした:', err);
+      } finally {
+        zipInput.dataset.prevZip = normalized;
+      }
+    };
+
+    zipInput.addEventListener('input', () => {
+      const normalized = normalizeZipcode(zipInput.value);
+      if (zipInput.value !== normalized) zipInput.value = normalized;
+      if (normalized.length < 7) lastRequestedZip = '';
+    });
+    zipInput.addEventListener('blur', execute);
+    zipInput.addEventListener('change', execute);
+  }
+
+  async function fetchUsers() {
+    const query = `
+      query UsersForList {
+        listUsers {
+          id
+          farmName
+          firstName
+          lastName
+          email
+          postalCode
+          address
+          gender
+          birthday
+          note
+          lastLoginAt
+          createdAt
+          parent {
+            id
+          }
+          fields {
+            id
+            name
+          }
+        }
+      }
+    `;
+    const result = await window.gql(query, {});
+    if (result?.errors?.length) throw new Error(result.errors[0]?.message || 'Failed to fetch users');
+    return Array.isArray(result?.data?.listUsers) ? result.data.listUsers : [];
+  }
+
+  function deriveOwnerOptionsFromUsers(users) {
+    const list = Array.isArray(users) ? users : [];
+    const owners = list
+      .filter((u) => !String(u?.parent?.id || '').trim())
+      .map((u) => ({
+        id: String(u?.id || '').trim(),
+        name: String(u?.farmName || '').trim() || `${String(u?.lastName || '').trim()} ${String(u?.firstName || '').trim()}`.trim() || String(u?.email || '').trim(),
+      }))
+      .filter((u) => u.id && u.name);
+
+    const uniq = new Map();
+    owners.forEach((u) => {
+      if (!uniq.has(u.id)) uniq.set(u.id, u);
+    });
+    return Array.from(uniq.values()).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  }
+
+  function populateUserList(users) {
+    clearUserSections();
+    (Array.isArray(users) ? users : []).forEach((user) => {
+      const fields = Array.isArray(user?.fields) ? user.fields.map((f) => ({ id: String(f?.id || '').trim(), name: String(f?.name || '').trim() })).filter((f) => f.name) : [];
+      const isOwner = !String(user?.parent?.id || '').trim();
+      buildWorkerCard({
+        id: String(user?.id || '').trim(),
+        farmName: String(user?.farmName || '').trim(),
+        name: getDisplayName(user),
+        lastName: String(user?.lastName || '').trim(),
+        firstName: String(user?.firstName || '').trim(),
+        email: String(user?.email || '').trim(),
+        isOwner,
+        ownerId: String(user?.parent?.id || '').trim(),
+        fields,
+        postalCode: String(user?.postalCode || '').trim(),
+        address: String(user?.address || '').trim(),
+        gender: normalizeGender(user?.gender),
+        birthday: normalizeDateOnly(user?.birthday),
+        note: String(user?.note || '').trim(),
+        lastLogin: formatDateTime(user?.lastLoginAt),
+        createdAt: formatDateTime(user?.createdAt),
+      });
+    });
+    const derivedOwners = deriveOwnerOptionsFromUsers(users);
+    if (isOwnerUser) {
+      const currentOwner = derivedOwners.find((u) => u.id === currentUserId);
+      ownerOptions = currentOwner ? [currentOwner] : ownerOptions.filter((u) => u.id === currentUserId);
+    } else if (!ownerOptions.length && derivedOwners.length) {
+      ownerOptions = derivedOwners;
+    }
+
+    filteredCards = getAllCards();
+    syncNewUserSelects();
+    syncDetailSelects();
+    applyUserSearch();
+  }
+
+  async function initializeUserListFromGraphQL() {
+    try {
+      const users = await fetchUsers();
+      populateUserList(users);
+    } catch (err) {
+      console.error('Failed to load users:', err);
+      filteredCards = getAllCards();
+      applyUserSearch();
+    }
   }
 
   // ---------- Search + Pagination ----------
@@ -136,6 +338,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------- Options: owners + fields ----------
+  let ownerOptions = [];
+  let newUserFieldOptions = [];
+
   function getOwnerNames() {
     const cards = getAllCards();
     return cards
@@ -162,6 +367,89 @@ document.addEventListener('DOMContentLoaded', () => {
     if (values.includes(current)) selectEl.value = current;
   }
 
+  function fillObjectSelectOptions(selectEl, items, placeholder = null) {
+    if (!selectEl) return;
+    const current = String(selectEl.value || '');
+    const list = Array.isArray(items) ? items : [];
+    const opts = list.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
+    const ph = placeholder ? `<option value="">${escapeHtml(placeholder)}</option>` : '';
+    selectEl.innerHTML = ph + opts;
+    if (list.some(item => String(item.id) === current)) selectEl.value = current;
+  }
+
+  async function fetchOwnersForSelect() {
+    const query = `
+      query FindUsersForOwnerSelect($roleID: ID!) {
+        findUsers(roleID: $roleID) {
+          id
+          farmName
+          firstName
+          lastName
+          email
+        }
+      }
+    `;
+    let result = await window.gql(query, { roleID: '2' });
+    if (result?.errors?.length) {
+      console.warn('findUsers(roleID: "2") failed for owner select:', result.errors);
+      const fallbackQuery = `
+        query FindUsersForOwnerSelectFallback {
+          findUsers(roleID: 2) {
+            id
+            farmName
+            firstName
+            lastName
+            email
+          }
+        }
+      `;
+      result = await window.gql(fallbackQuery, {});
+    }
+    if (result?.errors?.length) throw new Error(result.errors[0]?.message || 'Failed to fetch owners');
+    const list = Array.isArray(result?.data?.findUsers) ? result.data.findUsers : [];
+    return list
+      .map((u) => {
+        const id = String(u?.id || '').trim();
+        const name = String(u?.farmName || '').trim() || `${String(u?.lastName || '').trim()} ${String(u?.firstName || '').trim()}`.trim() || String(u?.email || '').trim();
+        return { id, name };
+      })
+      .filter((u) => u.id && u.name)
+      .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  }
+
+  async function fetchFieldsForOwner(ownerId) {
+    const normalizedOwnerId = String(ownerId || '').trim();
+    if (!normalizedOwnerId) return [];
+    const query = `
+      query FindFields($ownerID: ID) {
+        findFields(ownerID: $ownerID) {
+          id
+          name
+        }
+      }
+    `;
+    const result = await window.gql(query, { ownerID: normalizedOwnerId });
+    if (result?.errors?.length) throw new Error(result.errors[0]?.message || 'Failed to fetch fields');
+    const list = Array.isArray(result?.data?.findFields) ? result.data.findFields : [];
+    return list
+      .map((f) => ({ id: String(f?.id || '').trim(), name: String(f?.name || '').trim() }))
+      .filter((f) => f.id && f.name)
+      .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  }
+
+  async function preloadOwnerOptions() {
+    try {
+      if (isOwnerUser) {
+        ownerOptions = ownerOptions.filter((u) => u.id === currentUserId);
+        return;
+      }
+      ownerOptions = await fetchOwnersForSelect();
+    } catch (err) {
+      console.error('Failed to preload owners:', err);
+      ownerOptions = [];
+    }
+  }
+
   // ---------- New User Modal ----------
   const newUserButton = qs('#new-user-button');
   const newUserModalBackdrop = qs('#new-user-modal-backdrop');
@@ -169,12 +457,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const newUserCancel = qs('#new-user-cancel');
   const newUserSave = qs('#new-user-save');
 
-  const newUserName = qs('#new-user-name');
+  const newUserFarmName = qs('#new-user-farm-name');
+  const newUserLastName = qs('#new-user-last-name');
+  const newUserFirstName = qs('#new-user-first-name');
   const newUserEmail = qs('#new-user-email');
   const newUserPassword = qs('#new-user-password');
+  const newUserPostalCode = qs('#new-user-postal-code');
+  const newUserAddress = qs('#new-user-address');
+  const newUserGender = qs('#new-user-gender');
+  const newUserBirthday = qs('#new-user-birthday');
+  const newUserNote = qs('#new-user-note');
   const newUserOwner = qs('#new-user-owner');
+
+  bindZipcodeAutoFill(newUserPostalCode, newUserAddress);
   const ownerSelectWrapper = qs('#owner-select-wrapper');
   const ownerSelect = qs('#new-user-owner-select');
+  const newUserOwnerCheckboxGroup = qs('#new-user-owner-checkbox-group');
+  const newUserFarmNameGroup = qs('#new-user-farm-name-group');
+  const newUserFieldsGroup = qs('#new-user-fields-group');
 
   const newFieldSelect = qs('#new-field-select');
   const newFieldAdd = qs('#new-field-add');
@@ -186,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
     container.innerHTML = fields.map((f, idx) => `
       <span class="chip">
-        ${escapeHtml(f)}
+        ${escapeHtml(typeof f === 'string' ? f : (f?.name || ''))}
         <button class="chip-remove" type="button" data-chip-index="${idx}" aria-label="remove">×</button>
       </span>
     `).join('');
@@ -198,50 +498,137 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function resetNewUserForm() {
-    if (newUserName) newUserName.value = '';
+  function isValidPassword(password) {
+    const re = /^[A-Za-z0-9!.\-=_#@<>]{8,20}$/;
+    return re.test(String(password || ''));
+  }
+
+  function getSelectedOwnerIdForNewUser() {
+    if (isOwnerUser) return currentUserId;
+    return String(ownerSelect?.value || '').trim();
+  }
+
+  function isNewUserOwnerMode() {
+    return isAdminUser && !!newUserOwner?.checked;
+  }
+
+  async function updateNewUserFieldOptions() {
+    const shouldShowFields = !isNewUserOwnerMode();
+    if (newUserFieldsGroup) newUserFieldsGroup.style.display = shouldShowFields ? '' : 'none';
+    if (!shouldShowFields) {
+      newUserFieldOptions = [];
+      newSelectedFields = [];
+      fillObjectSelectOptions(newFieldSelect, [], '圃場を選択');
+      renderChips(newFieldChips, newSelectedFields, (i) => {
+        newSelectedFields.splice(i, 1);
+        renderChips(newFieldChips, newSelectedFields, arguments.callee);
+      });
+      return;
+    }
+
+    const ownerId = getSelectedOwnerIdForNewUser();
+    if (!ownerId) {
+      newUserFieldOptions = [];
+      newSelectedFields = [];
+      fillObjectSelectOptions(newFieldSelect, [], '先に所属オーナーを選択');
+      renderChips(newFieldChips, newSelectedFields, (i) => {
+        newSelectedFields.splice(i, 1);
+        renderChips(newFieldChips, newSelectedFields, arguments.callee);
+      });
+      return;
+    }
+
+    try {
+      newUserFieldOptions = await fetchFieldsForOwner(ownerId);
+    } catch (err) {
+      console.error('Failed to load fields for owner:', err);
+      newUserFieldOptions = [];
+    }
+
+    const validIds = new Set(newUserFieldOptions.map((f) => f.id));
+    newSelectedFields = newSelectedFields.filter((f) => validIds.has(f.id));
+    fillObjectSelectOptions(newFieldSelect, newUserFieldOptions, newUserFieldOptions.length ? '圃場を選択' : '選択できる圃場がありません');
+    renderChips(newFieldChips, newSelectedFields, (i) => {
+      newSelectedFields.splice(i, 1);
+      renderChips(newFieldChips, newSelectedFields, arguments.callee);
+    });
+  }
+
+  function updateNewUserRoleUI() {
+    const ownerMode = isNewUserOwnerMode();
+    if (newUserOwnerCheckboxGroup) newUserOwnerCheckboxGroup.style.display = isAdminUser ? '' : 'none';
+    if (newUserOwner) newUserOwner.disabled = !isAdminUser;
+    if (newUserFarmNameGroup) newUserFarmNameGroup.style.display = (isAdminUser && ownerMode) ? '' : 'none';
+    if (ownerSelectWrapper) ownerSelectWrapper.style.display = ownerMode || isOwnerUser ? 'none' : '';
+    updateNewUserFieldOptions();
+  }
+
+  async function resetNewUserForm() {
+    if (newUserFarmName) newUserFarmName.value = '';
+    if (newUserLastName) newUserLastName.value = '';
+    if (newUserFirstName) newUserFirstName.value = '';
     if (newUserEmail) newUserEmail.value = '';
     if (newUserPassword) newUserPassword.value = '';
+    if (newUserPostalCode) newUserPostalCode.value = '';
+    if (newUserAddress) newUserAddress.value = '';
+    if (newUserGender) newUserGender.value = '';
+    if (newUserBirthday) newUserBirthday.value = '';
+    if (newUserNote) newUserNote.value = '';
     if (newUserOwner) newUserOwner.checked = false;
+    if (ownerSelect) ownerSelect.value = isOwnerUser ? currentUserId : '';
+    syncNewUserSelects();
     newSelectedFields = [];
     renderChips(newFieldChips, newSelectedFields, (i) => {
       newSelectedFields.splice(i, 1);
       renderChips(newFieldChips, newSelectedFields, arguments.callee);
     });
-    if (ownerSelectWrapper) ownerSelectWrapper.style.display = '';
+    updateNewUserRoleUI();
+    await updateNewUserFieldOptions();
   }
 
   function syncNewUserSelects() {
-    fillSelectOptions(ownerSelect, getOwnerNames(), 'オーナーを選択');
-    fillSelectOptions(newFieldSelect, getAllFieldNames(), '圃場を選択');
+    if (!ownerSelect) return;
+    if (isOwnerUser) {
+      fillObjectSelectOptions(ownerSelect, ownerOptions, ownerOptions.length ? null : 'オーナーを選択');
+      ownerSelect.value = currentUserId;
+      return;
+    }
+    fillObjectSelectOptions(ownerSelect, ownerOptions, 'オーナーを選択');
   }
 
-  function openNewUserModal() {
+  async function openNewUserModal() {
     syncNewUserSelects();
-    resetNewUserForm();
+    await resetNewUserForm();
     openBackdrop(newUserModalBackdrop);
   }
   function closeNewUserModal() {
     closeBackdrop(newUserModalBackdrop);
   }
 
-  if (newUserButton) newUserButton.addEventListener('click', openNewUserModal);
+  if (newUserButton) newUserButton.addEventListener('click', () => { openNewUserModal(); });
   if (newUserModalClose) newUserModalClose.addEventListener('click', closeNewUserModal);
   if (newUserCancel) newUserCancel.addEventListener('click', closeNewUserModal);
   bindBackdropClose(newUserModalBackdrop, closeNewUserModal);
 
   if (newUserOwner) {
     newUserOwner.addEventListener('change', () => {
-      if (!ownerSelectWrapper) return;
-      ownerSelectWrapper.style.display = newUserOwner.checked ? 'none' : '';
+      updateNewUserRoleUI();
+    });
+  }
+
+  if (ownerSelect) {
+    ownerSelect.addEventListener('change', () => {
+      updateNewUserFieldOptions();
     });
   }
 
   if (newFieldAdd) {
     newFieldAdd.addEventListener('click', () => {
-      const v = (newFieldSelect?.value || '').trim();
-      if (!v) return;
-      if (!newSelectedFields.includes(v)) newSelectedFields.push(v);
+      const selectedId = String(newFieldSelect?.value || '').trim();
+      if (!selectedId) return;
+      const field = newUserFieldOptions.find((f) => f.id === selectedId);
+      if (!field) return;
+      if (!newSelectedFields.some((f) => f.id === field.id)) newSelectedFields.push(field);
       renderChips(newFieldChips, newSelectedFields, (i) => {
         newSelectedFields.splice(i, 1);
         renderChips(newFieldChips, newSelectedFields, arguments.callee);
@@ -250,20 +637,64 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function buildWorkerCard({ id, name, email, isOwner, fields, lastLogin, createdAt }) {
+  async function createUserMutation(input) {
+    const query = `
+      mutation CreateUser($input: CreateUserInput!) {
+        createUser(input: $input) {
+          id
+          farmName
+          firstName
+          lastName
+          email
+          postalCode
+          address
+          gender
+          birthday
+          note
+          createdAt
+          lastLoginAt
+          parent {
+            id
+          }
+          fields {
+            id
+            name
+          }
+        }
+      }
+    `;
+    const result = await window.gql(query, { input });
+    if (result?.errors?.length) throw new Error(result.errors[0]?.message || 'Failed to create user');
+    return result?.data?.createUser || null;
+  }
+
+  function buildWorkerCard({ id, farmName = '', name, lastName = '', firstName = '', email, isOwner, ownerId = '', fields, postalCode = '', address = '', gender = '', birthday = '', note = '', lastLogin, createdAt }) {
     const roleLabel = isOwner ? 'OWNER' : 'WORKER';
     const sectionSelector = isOwner ? '[data-section="owner"]' : '[data-section="worker"]';
     const section = qs(sectionSelector, userList);
     const cardsContainer = section || userList;
 
-    const chips = (fields || []).map(f => `<span class="worker-field-chip">${escapeHtml(f)}</span>`).join('');
+    const fieldList = Array.isArray(fields) ? fields : [];
+    const fieldNames = fieldList.map((f) => typeof f === 'string' ? f : String(f?.name || '').trim()).filter(Boolean);
+    const fieldIds = fieldList.map((f) => typeof f === 'string' ? '' : String(f?.id || '').trim());
+    const chips = fieldNames.map(f => `<span class="worker-field-chip">${escapeHtml(typeof f === 'string' ? f : (f?.name || ''))}</span>`).join('');
     const article = document.createElement('article');
     article.className = 'report-card worker-card';
     article.dataset.userId = id;
+    article.dataset.farmName = farmName || '';
     article.dataset.name = name;
+    article.dataset.lastName = lastName || '';
+    article.dataset.firstName = firstName || '';
     article.dataset.email = email;
     article.dataset.owner = isOwner ? 'はい' : 'いいえ';
-    article.dataset.fields = (fields || []).join(',');
+    article.dataset.ownerId = ownerId || '';
+    article.dataset.fields = fieldNames.join(',');
+    article.dataset.fieldIds = fieldIds.join(',');
+    article.dataset.postalCode = postalCode || '';
+    article.dataset.address = address || '';
+    article.dataset.gender = normalizeGender(gender);
+    article.dataset.birthday = normalizeDateOnly(birthday);
+    article.dataset.note = note || '';
     article.dataset.lastLogin = lastLogin || '-';
     article.dataset.createdAt = createdAt || '-';
 
@@ -274,6 +705,12 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="worker-role-pill">${roleLabel}</span>
         </div>
         <div class="worker-email">${escapeHtml(email)}</div>
+        <div class="worker-company${farmName ? '' : ' is-empty'}">
+          <span class="worker-company-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><path d="M4 20h16v-2H4v2zm2-4h3V4H6v12zm5 0h2V8h-2v8zm4 0h3V6h-3v10z"/></svg>
+          </span>
+          <span class="worker-company-name">${escapeHtml(farmName || '—')}</span>
+        </div>
         <div class="worker-fields">${chips}</div>
       </div>
       <div class="worker-meta">
@@ -301,29 +738,69 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (newUserSave) {
-    newUserSave.addEventListener('click', () => {
-      const name = (newUserName?.value || '').trim();
+    newUserSave.addEventListener('click', async () => {
+      const farmName = (newUserFarmName?.value || '').trim();
+      const lastName = (newUserLastName?.value || '').trim();
+      const firstName = (newUserFirstName?.value || '').trim();
+      const name = `${lastName} ${firstName}`.trim();
       const email = (newUserEmail?.value || '').trim();
-      if (!name || !email) {
-        alert('氏名とメールアドレスを入力してください。');
+      const password = String(newUserPassword?.value || '');
+      const postalCode = normalizeZipcode(newUserPostalCode?.value || '');
+      const address = (newUserAddress?.value || '').trim();
+      const gender = normalizeGender(newUserGender?.value);
+      const birthday = normalizeDateOnly(newUserBirthday?.value);
+      const note = (newUserNote?.value || '').trim();
+      const isOwner = isNewUserOwnerMode();
+      const ownerId = getSelectedOwnerIdForNewUser();
+
+      if (!lastName || !firstName || !email || !password) {
+        alert('姓、名、メールアドレス、パスワードを入力してください。');
         return;
       }
-      const isOwner = !!newUserOwner?.checked;
-      const id = `U${String(Math.floor(Math.random() * 9000) + 1000)}`;
-      buildWorkerCard({
-        id,
-        name,
-        email,
-        isOwner,
-        fields: newSelectedFields.slice(),
-        lastLogin: '-',
-        createdAt: nowYmdHi()
-      });
+      if (!isValidPassword(password)) {
+        alert('パスワードは8文字以上20文字以下の半角英数字で入力してください。記号は !.-=_#@<> が使用できます。');
+        return;
+      }
+      if (!postalCode || postalCode.length !== 7 || !address || !gender || !birthday) {
+        alert('郵便番号、住所、性別、生年月日を入力してください。');
+        return;
+      }
+      if (!isOwner && !ownerId) {
+        alert('所属オーナーを選択してください。');
+        return;
+      }
 
-      // refresh lists / pagination
-      filteredCards = getAllCards();
-      applyUserSearch();
-      closeNewUserModal();
+      const input = {
+        parentID: isOwner ? null : Number(ownerId),
+        roleID: isOwner ? 2 : 3,
+        email,
+        password,
+        farmName,
+        firstName,
+        lastName,
+        postalCode,
+        address,
+        gender,
+        birthday,
+        note,
+        fieldIDs: isOwner ? [] : newSelectedFields.map((f) => String(f.id)),
+      };
+
+      const oldDisabled = newUserSave.disabled;
+      newUserSave.disabled = true;
+      try {
+        await createUserMutation(input);
+        await preloadOwnerOptions();
+        await initializeUserListFromGraphQL();
+        closeNewUserModal();
+        alert('登録しました。');
+      } catch (err) {
+        console.error('Failed to create user:', err);
+        alert(`登録に失敗しました。
+${err.message || err}`);
+      } finally {
+        newUserSave.disabled = oldDisabled;
+      }
     });
   }
 
@@ -332,9 +809,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const detailClose = qs('#user-detail-modal-close');
 
   const detailUserId = qs('#detail-user-id');
-  const detailUserName = qs('#detail-user-name');
+  const detailUserFarmName = qs('#detail-user-farm-name');
+  const detailUserLastName = qs('#detail-user-last-name');
+  const detailUserFirstName = qs('#detail-user-first-name');
   const detailUserEmail = qs('#detail-user-email');
+  const detailUserPassword = qs('#detail-user-password');
+  const detailUserPostalCode = qs('#detail-user-postal-code');
+  const detailUserAddress = qs('#detail-user-address');
+  const detailUserGender = qs('#detail-user-gender');
+  const detailUserBirthday = qs('#detail-user-birthday');
+  const detailUserNote = qs('#detail-user-note');
   const detailUserOwner = qs('#detail-user-owner');
+
+  bindZipcodeAutoFill(detailUserPostalCode, detailUserAddress);
   const detailOwnerWrapper = qs('#detail-owner-select-wrapper');
   const detailOwnerSelect = qs('#detail-user-owner-select');
 
@@ -352,17 +839,73 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let activeCard = null;
   let detailSelectedFields = [];
+  let detailFieldOptions = [];
   let originalSnapshot = null;
 
+  function renderDetailFieldChips() {
+    renderChips(detailFieldChips, detailSelectedFields, (i) => {
+      detailSelectedFields.splice(i, 1);
+      renderDetailFieldChips();
+    });
+  }
+
+  async function updateDetailFieldOptions() {
+    const isOwner = !!detailUserOwner?.checked;
+    const ownerId = originalSnapshot?.ownerId || String(detailOwnerSelect?.value || '').trim();
+    const canEditFields = !isOwner;
+    if (detailFieldSelect) detailFieldSelect.disabled = !canEditFields;
+    if (detailFieldAdd) detailFieldAdd.disabled = !canEditFields;
+    if (!canEditFields) {
+      detailFieldOptions = [];
+      fillObjectSelectOptions(detailFieldSelect, [], '圃場を選択');
+      return;
+    }
+    if (!ownerId) {
+      detailFieldOptions = [];
+      fillObjectSelectOptions(detailFieldSelect, [], '先に所属オーナーを選択');
+      return;
+    }
+    try {
+      detailFieldOptions = await fetchFieldsForOwner(ownerId);
+    } catch (err) {
+      console.error('Failed to load detail fields for owner:', err);
+      detailFieldOptions = [];
+    }
+    const validIds = new Set(detailFieldOptions.map((f) => String(f.id)));
+    detailSelectedFields = detailSelectedFields.filter((f) => !f?.id || validIds.has(String(f.id)));
+    fillObjectSelectOptions(detailFieldSelect, detailFieldOptions, detailFieldOptions.length ? '圃場を選択' : '選択できる圃場がありません');
+    renderDetailFieldChips();
+  }
+
   function syncDetailSelects() {
-    fillSelectOptions(detailOwnerSelect, getOwnerNames(), 'オーナーを選択');
-    fillSelectOptions(detailFieldSelect, getAllFieldNames(), '圃場を選択');
+    fillObjectSelectOptions(detailOwnerSelect, ownerOptions, 'オーナーを選択');
+  }
+
+  function getOwnerOptionById(ownerId) {
+    const id = String(ownerId || '').trim();
+    if (!id) return null;
+    return ownerOptions.find((u) => String(u?.id || '').trim() === id) || null;
+  }
+
+  function updateDetailRoleUI() {
+    const isOwner = !!detailUserOwner?.checked;
+    const farmGroup = qs('#detail-user-farm-name-group');
+    const passwordGroup = qs('#detail-user-password-group');
+    const isEditing = btnSave && btnSave.style.display !== 'none';
+    if (farmGroup) farmGroup.style.display = isOwner ? '' : 'none';
+    if (passwordGroup) passwordGroup.style.display = 'none';
+    if (detailOwnerWrapper) detailOwnerWrapper.style.display = isOwner ? 'none' : '';
+    if (detailOwnerSelect) detailOwnerSelect.disabled = true;
+    const selector = qs('#detail-field-selector');
+    if (selector) selector.style.display = (!isOwner && isEditing) ? '' : 'none';
   }
 
   function setDetailEditMode(isEdit) {
     const disabled = !isEdit;
-    [detailUserName, detailUserEmail, detailUserOwner, detailOwnerSelect, detailFieldSelect, detailFieldAdd, detailLastLogin, detailCreatedAt]
+    [detailUserFarmName, detailUserLastName, detailUserFirstName, detailUserEmail, detailUserPostalCode, detailUserAddress, detailUserGender, detailUserBirthday, detailUserNote, detailLastLogin, detailCreatedAt]
       .forEach(el => { if (!el) return; el.disabled = disabled; });
+    if (detailUserPassword) detailUserPassword.disabled = true;
+    if (detailOwnerSelect) detailOwnerSelect.disabled = true;
 
     if (detailLastLogin) detailLastLogin.disabled = true;
     if (detailCreatedAt) detailCreatedAt.disabled = true;
@@ -372,12 +915,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnCancel) btnCancel.style.display = isEdit ? '' : 'none';
     if (btnDelete) btnDelete.style.display = isEdit ? '' : 'none';
 
-    // owner select visibility
-    const isOwner = !!detailUserOwner?.checked;
-    if (detailOwnerWrapper) detailOwnerWrapper.style.display = (!isOwner) ? '' : 'none';
+    if (detailUserOwner) detailUserOwner.disabled = true;
+    updateDetailRoleUI();
   }
 
-  function openDetail(card) {
+  async function openDetail(card) {
     activeCard = card;
     if (!activeCard) return;
 
@@ -386,30 +928,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const data = activeCard.dataset;
     originalSnapshot = {
       userId: data.userId || '',
+      farmName: data.farmName || '',
       name: data.name || '',
+      lastName: data.lastName || '',
+      firstName: data.firstName || '',
       email: data.email || '',
       owner: data.owner || 'いいえ',
-      fields: (data.fields || '').split(',').map(s => s.trim()).filter(Boolean),
+      ownerId: data.ownerId || '',
+      fields: (() => {
+        const names = String(data.fields || '').split(',').map(s => s.trim()).filter(Boolean);
+        const ids = String(data.fieldIds || '').split(',').map(s => s.trim());
+        return names.map((name, idx) => ({ id: ids[idx] || '', name })).filter((f) => f.name);
+      })(),
+      postalCode: data.postalCode || '',
+      address: data.address || '',
+      gender: normalizeGender(data.gender || ''),
+      birthday: normalizeDateOnly(data.birthday || ''),
+      note: data.note || '',
       lastLogin: data.lastLogin || '-',
       createdAt: data.createdAt || '-'
     };
 
     if (detailUserId) detailUserId.textContent = originalSnapshot.userId;
-    if (detailUserName) detailUserName.value = originalSnapshot.name;
+    if (detailUserFarmName) detailUserFarmName.value = originalSnapshot.farmName;
+    if (detailUserLastName) detailUserLastName.value = originalSnapshot.lastName;
+    if (detailUserFirstName) detailUserFirstName.value = originalSnapshot.firstName;
+    if (detailUserPassword) detailUserPassword.value = '';
     if (detailUserEmail) detailUserEmail.value = originalSnapshot.email;
+    if (detailUserPostalCode) detailUserPostalCode.value = originalSnapshot.postalCode;
+    if (detailUserAddress) detailUserAddress.value = originalSnapshot.address;
+    if (detailUserGender) detailUserGender.value = originalSnapshot.gender;
+    if (detailUserBirthday) detailUserBirthday.value = originalSnapshot.birthday;
+    if (detailUserNote) detailUserNote.value = originalSnapshot.note;
     if (detailUserOwner) detailUserOwner.checked = originalSnapshot.owner === 'はい';
     detailSelectedFields = originalSnapshot.fields.slice();
-    renderChips(detailFieldChips, detailSelectedFields, (i) => {
-      detailSelectedFields.splice(i, 1);
-      renderChips(detailFieldChips, detailSelectedFields, arguments.callee);
-    });
+    renderDetailFieldChips();
     if (detailLastLogin) detailLastLogin.value = originalSnapshot.lastLogin;
     if (detailCreatedAt) detailCreatedAt.value = originalSnapshot.createdAt;
 
     // owner select
-    if (detailOwnerSelect) detailOwnerSelect.value = '';
-    if (detailOwnerWrapper) detailOwnerWrapper.style.display = (detailUserOwner?.checked) ? 'none' : '';
+    if (detailOwnerSelect) {
+      const ownerId = originalSnapshot.ownerId || '';
+      detailOwnerSelect.value = ownerId;
+      if (!detailOwnerSelect.value && ownerId) {
+        const ownerOpt = getOwnerOptionById(ownerId);
+        if (ownerOpt) {
+          detailOwnerSelect.innerHTML = `<option value="${escapeHtml(ownerOpt.id)}">${escapeHtml(ownerOpt.name)}</option>`;
+          detailOwnerSelect.value = ownerOpt.id;
+        }
+      }
+    }
 
+    await updateDetailFieldOptions();
     setDetailEditMode(false);
     openBackdrop(detailBackdrop);
   }
@@ -428,43 +998,55 @@ document.addEventListener('DOMContentLoaded', () => {
   userList.addEventListener('click', (e) => {
     const card = e.target.closest('.worker-card');
     if (!card) return;
-    openDetail(card);
+    void openDetail(card);
   });
 
   if (detailUserOwner) {
     detailUserOwner.addEventListener('change', () => {
-      if (detailOwnerWrapper) detailOwnerWrapper.style.display = detailUserOwner.checked ? 'none' : '';
+      updateDetailRoleUI();
     });
   }
 
   if (detailFieldAdd) {
     detailFieldAdd.addEventListener('click', () => {
-      const v = (detailFieldSelect?.value || '').trim();
-      if (!v) return;
-      if (!detailSelectedFields.includes(v)) detailSelectedFields.push(v);
-      renderChips(detailFieldChips, detailSelectedFields, (i) => {
-        detailSelectedFields.splice(i, 1);
-        renderChips(detailFieldChips, detailSelectedFields, arguments.callee);
-      });
+      const selectedId = String(detailFieldSelect?.value || '').trim();
+      if (!selectedId) return;
+      const field = detailFieldOptions.find((f) => String(f.id) === selectedId);
+      if (!field) return;
+      if (!detailSelectedFields.some((f) => String((typeof f === 'string' ? '' : f?.id) || '') === String(field.id))) {
+        detailSelectedFields.push(field);
+        renderDetailFieldChips();
+      }
       if (detailFieldSelect) detailFieldSelect.value = '';
     });
   }
 
   if (btnEdit) {
-    btnEdit.addEventListener('click', () => setDetailEditMode(true));
+    btnEdit.addEventListener('click', async () => {
+      setDetailEditMode(true);
+      await updateDetailFieldOptions();
+    });
   }
 
   if (btnCancel) {
     btnCancel.addEventListener('click', () => {
       if (!originalSnapshot) return;
-      if (detailUserName) detailUserName.value = originalSnapshot.name;
+      if (detailUserFarmName) detailUserFarmName.value = originalSnapshot.farmName;
+      if (detailUserLastName) detailUserLastName.value = originalSnapshot.lastName;
+      if (detailUserFirstName) detailUserFirstName.value = originalSnapshot.firstName;
+      if (detailUserPassword) detailUserPassword.value = '';
       if (detailUserEmail) detailUserEmail.value = originalSnapshot.email;
+      if (detailUserPostalCode) detailUserPostalCode.value = originalSnapshot.postalCode;
+      if (detailUserAddress) detailUserAddress.value = originalSnapshot.address;
+      if (detailUserGender) detailUserGender.value = originalSnapshot.gender;
+      if (detailUserBirthday) detailUserBirthday.value = originalSnapshot.birthday;
+      if (detailUserNote) detailUserNote.value = originalSnapshot.note;
       if (detailUserOwner) detailUserOwner.checked = originalSnapshot.owner === 'はい';
+      if (detailOwnerSelect) detailOwnerSelect.value = originalSnapshot.ownerId || '';
       detailSelectedFields = originalSnapshot.fields.slice();
-      renderChips(detailFieldChips, detailSelectedFields, (i) => {
-        detailSelectedFields.splice(i, 1);
-        renderChips(detailFieldChips, detailSelectedFields, arguments.callee);
-      });
+      renderDetailFieldChips();
+      updateDetailRoleUI();
+      updateDetailFieldOptions();
       setDetailEditMode(false);
     });
   }
@@ -473,32 +1055,61 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSave.addEventListener('click', () => {
       if (!activeCard) return;
 
-      const name = (detailUserName?.value || '').trim();
+      const farmName = (detailUserFarmName?.value || '').trim();
+      const lastName = (detailUserLastName?.value || '').trim();
+      const firstName = (detailUserFirstName?.value || '').trim();
+      const name = `${lastName} ${firstName}`.trim();
       const email = (detailUserEmail?.value || '').trim();
-      if (!name || !email) {
-        alert('氏名とメールアドレスを入力してください。');
+      const password = String(detailUserPassword?.value || '');
+      if (!lastName || !firstName || !email) {
+        alert('姓、名、メールアドレスを入力してください。');
+        return;
+      }
+      if (password && !isValidPassword(password)) {
+        alert('パスワードは8文字以上20文字以下の半角英数字で入力してください。記号は !.-=_#@<> が使用できます。');
         return;
       }
 
       const isOwner = !!detailUserOwner?.checked;
+      const ownerId = originalSnapshot?.ownerId || String(detailOwnerSelect?.value || '').trim();
+      const postalCode = (detailUserPostalCode?.value || '').trim();
+      const address = (detailUserAddress?.value || '').trim();
+      const gender = normalizeGender(detailUserGender?.value);
+      const birthday = normalizeDateOnly(detailUserBirthday?.value);
+      const note = (detailUserNote?.value || '').trim();
 
       // update dataset
+      activeCard.dataset.farmName = farmName;
       activeCard.dataset.name = name;
+      activeCard.dataset.lastName = lastName;
+      activeCard.dataset.firstName = firstName;
       activeCard.dataset.email = email;
       activeCard.dataset.owner = isOwner ? 'はい' : 'いいえ';
-      activeCard.dataset.fields = detailSelectedFields.join(',');
+      activeCard.dataset.ownerId = isOwner ? '' : ownerId;
+      activeCard.dataset.fields = detailSelectedFields.map((f) => typeof f === 'string' ? f : (f?.name || '')).filter(Boolean).join(',');
+      activeCard.dataset.fieldIds = detailSelectedFields.map((f) => typeof f === 'string' ? '' : (f?.id || '')).join(',');
+      activeCard.dataset.postalCode = postalCode;
+      activeCard.dataset.address = address;
+      activeCard.dataset.gender = gender;
+      activeCard.dataset.birthday = birthday;
+      activeCard.dataset.note = note;
 
       // update visible UI
       const nameEl = qs('.worker-name', activeCard);
       const emailEl = qs('.worker-email', activeCard);
+      const farmNameEl = qs('.worker-company-name', activeCard);
+      const farmWrapEl = qs('.worker-company', activeCard);
       const rolePill = qs('.worker-role-pill', activeCard);
       const fieldsWrap = qs('.worker-fields', activeCard);
 
       if (nameEl) nameEl.textContent = name;
       if (emailEl) emailEl.textContent = email;
+      if (farmNameEl) farmNameEl.textContent = isOwner ? (farmName || '—') : '—';
+      if (farmWrapEl) farmWrapEl.classList.toggle('is-empty', !(isOwner && farmName));
+      if (farmWrapEl) farmWrapEl.style.display = isOwner ? '' : 'none';
       if (rolePill) rolePill.textContent = isOwner ? 'OWNER' : 'WORKER';
       if (fieldsWrap) {
-        fieldsWrap.innerHTML = detailSelectedFields.map(f => `<span class="worker-field-chip">${escapeHtml(f)}</span>`).join('');
+        fieldsWrap.innerHTML = detailSelectedFields.map(f => `<span class="worker-field-chip">${escapeHtml(typeof f === 'string' ? f : (f?.name || ''))}</span>`).join('');
       }
 
       // move section if owner flag changed
@@ -517,6 +1128,25 @@ document.addEventListener('DOMContentLoaded', () => {
       // refresh selects (owner list may have changed)
       syncNewUserSelects();
       syncDetailSelects();
+
+      originalSnapshot = {
+        userId: activeCard.dataset.userId || '',
+        farmName,
+        name,
+        lastName,
+        firstName,
+        email,
+        owner: isOwner ? 'はい' : 'いいえ',
+        ownerId: isOwner ? '' : ownerId,
+        fields: detailSelectedFields.slice(),
+        postalCode,
+        address,
+        gender,
+        birthday,
+        note,
+        lastLogin: activeCard.dataset.lastLogin || '-',
+        createdAt: activeCard.dataset.createdAt || '-'
+      };
 
       // refresh search/pagination
       applyUserSearch();
@@ -544,6 +1174,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // initial
-  filteredCards = getAllCards();
-  applyUserSearch();
+  preloadOwnerOptions().finally(() => {
+    initializeUserListFromGraphQL();
+  });
 });
