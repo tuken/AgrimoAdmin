@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const userId = String(grid.dataset.userId || '');
   const isRole1 = !!document.getElementById('owner-filter');
+  const orgLat = parseFiniteNumber(grid.dataset.orgLat);
+  const orgLng = parseFiniteNumber(grid.dataset.orgLng);
 
   const loadingEl = document.getElementById('fields-loading');
   const metaEl = document.getElementById('list-header-meta');
@@ -22,8 +24,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modalSaveBtn = document.getElementById('field-detail-save');
   const titleEl = document.getElementById('field-detail-title');
   const subtitleEl = document.getElementById('field-detail-subtitle');
-  const mapFrame = document.getElementById('field-map-frame');
+  const detailMapCanvas = document.getElementById('field-map-canvas');
   const coordsEl = document.getElementById('field-map-coords');
+
+  const inputLat = document.getElementById('detail-lat');
+  const inputLng = document.getElementById('detail-lng');
 
   const inputId = document.getElementById('detail-id');
   const inputName = document.getElementById('detail-name');
@@ -50,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const createLat = document.getElementById('create-lat');
   const createLng = document.getElementById('create-lng');
   const createNote = document.getElementById('create-note');
-  const createMapFrame = document.getElementById('field-create-map-frame');
+  const createMapCanvas = document.getElementById('field-create-map-canvas');
   const createCoordsEl = document.getElementById('field-create-map-coords');
 
   const hasModal = !!(backdrop && titleEl && inputName && inputType && inputStatus);
@@ -64,6 +69,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   let isEditing = false;
   let lastPostalLookupKey = '';
   let isAutoFillingAddress = false;
+  let detailMapPicker = null;
+  let createMapPicker = null;
+
+  detailMapPicker = createMapPickerController({
+    canvasEl: detailMapCanvas,
+    coordsEl,
+    latInput: inputLat,
+    lngInput: inputLng,
+    editable: false,
+    emptyZoom: 5,
+  });
+  createMapPicker = createMapPickerController({
+    canvasEl: createMapCanvas,
+    coordsEl: createCoordsEl,
+    latInput: createLat,
+    lngInput: createLng,
+    editable: true,
+    emptyZoom: 5,
+  });
 
   try {
     if (loadingEl) loadingEl.style.display = 'block';
@@ -116,6 +140,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   createLat?.addEventListener('input', updateCreateMapFromInputs);
   createLng?.addEventListener('input', updateCreateMapFromInputs);
+  inputLat?.addEventListener('input', updateDetailMapFromInputs);
+  inputLng?.addEventListener('input', updateDetailMapFromInputs);
   createPostal?.addEventListener('blur', handlePostalLookup);
   createPostal?.addEventListener('change', handlePostalLookup);
   createAddress?.addEventListener('blur', handleAddressGeocode);
@@ -156,6 +182,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     field.fieldStateDescription = getStateDescriptionById(field.fieldStateID) || inputStatus.options[inputStatus.selectedIndex]?.text || '';
     field.postalCode = inputPostal.value.trim();
     field.address = inputAddress.value.trim();
+    field.latitude = Number(String(inputLat?.value || '').trim());
+    field.longitude = Number(String(inputLng?.value || '').trim());
 
     render();
     openModal(field);
@@ -220,8 +248,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (code) input.fieldCode = code;
     if (Number.isFinite(area)) input.area = area;
 
-    const note = String(createNote?.value || '').trim();
-    if (note) input.note = note;
+    const rawNote = String(createNote?.value || '');
+    const note = rawNote.trim();
+    input.note = note ? note : '　';
 
     return input;
   }
@@ -256,7 +285,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         createAddress.value = address;
         isAutoFillingAddress = false;
       }
-      if (address) await geocodeAddress(address);
+      if (address) {
+        await geocodeAddress(address, {
+          postalCode: result?.zipcode || zipcode,
+          prefecture: result?.prefecture || '',
+          city: result?.city || '',
+          town: result?.town || '',
+        });
+      }
     } catch (err) {
       console.warn('郵便番号から住所を取得できませんでした:', err);
     }
@@ -267,15 +303,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const address = String(createAddress?.value || '').trim();
     if (!address) return;
     try {
-      await geocodeAddress(address);
+      await geocodeAddress(address, {
+        postalCode: String(createPostal?.value || '').replace(/\D/g, '').slice(0, 7),
+      });
     } catch (err) {
       console.warn('住所から緯度経度を取得できませんでした:', err);
     }
   }
 
-  async function geocodeAddress(address) {
+  async function geocodeAddress(address, options = {}) {
     if (!address) return null;
-    const geo = await fetchJson(`/field/api/geocode?address=${encodeURIComponent(address)}`);
+    const params = new URLSearchParams({ address: String(address || '').trim() });
+    const postalCode = String(options?.postalCode || '').replace(/\D/g, '').slice(0, 7);
+    if (postalCode) params.set('postalCode', postalCode);
+    if (options?.prefecture) params.set('prefecture', String(options.prefecture));
+    if (options?.city) params.set('city', String(options.city));
+    if (options?.town) params.set('town', String(options.town));
+
+    const geo = await fetchJson(`/field/api/geocode?${params.toString()}`);
     if (geo?.lat != null && geo?.lng != null) {
       if (createLat) createLat.value = String(geo.lat);
       if (createLng) createLng.value = String(geo.lng);
@@ -290,6 +335,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     resetCreateForm();
     createBackdrop.classList.add('open');
     createBackdrop.setAttribute('aria-hidden', 'false');
+    createMapPicker?.invalidateSize();
   }
 
   function closeCreateModal() {
@@ -304,13 +350,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (createArea) createArea.value = '';
     if (createAddress) createAddress.value = '';
     if (createPostal) createPostal.value = '';
-    if (createLat) createLat.value = '';
-    if (createLng) createLng.value = '';
     if (createNote) createNote.value = '';
     if (createType && createType.options.length) createType.selectedIndex = 0;
     if (createStatus && createStatus.options.length) createStatus.selectedIndex = 0;
     if (createOwner && createOwner.options?.length) createOwner.selectedIndex = 0;
-    updateCreateMap(null, null);
+
+    const initialLat = Number.isFinite(orgLat) ? orgLat : null;
+    const initialLng = Number.isFinite(orgLng) ? orgLng : null;
+
+    if (createLat) createLat.value = initialLat != null ? String(initialLat) : '';
+    if (createLng) createLng.value = initialLng != null ? String(initialLng) : '';
+    updateCreateMap(initialLat, initialLng);
   }
 
   function updateCreateMapFromInputs() {
@@ -318,15 +368,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function updateCreateMap(latRaw, lngRaw) {
-    const lat = Number(latRaw);
-    const lng = Number(lngRaw);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      if (createMapFrame) createMapFrame.src = `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}&z=16&output=embed`;
-      if (createCoordsEl) createCoordsEl.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
-    } else {
-      if (createMapFrame) createMapFrame.removeAttribute('src');
-      if (createCoordsEl) createCoordsEl.textContent = 'lat: -, lng: -';
-    }
+    createMapPicker?.setLatLng(latRaw, lngRaw, { center: true });
   }
 
   function applyFilter() {
@@ -363,6 +405,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     inputOwner.value = field.ownerName || '';
     inputPostal.value = field.postalCode || '';
     inputAddress.value = field.address || '';
+    if (inputLat) inputLat.value = field.latitude != null && field.latitude !== '' ? String(field.latitude) : '';
+    if (inputLng) inputLng.value = field.longitude != null && field.longitude !== '' ? String(field.longitude) : '';
 
     setSelectValue(inputType, String(field.fieldTypeID || ''));
     setSelectValue(inputStatus, String(field.fieldStateID || ''));
@@ -371,6 +415,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setEditing(false);
     backdrop.classList.add('open');
     backdrop.setAttribute('aria-hidden', 'false');
+    detailMapPicker?.invalidateSize();
   }
 
   function closeModal() {
@@ -387,21 +432,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (inputStatus) inputStatus.disabled = !isEditing;
     if (inputPostal) inputPostal.disabled = !isEditing;
     if (inputAddress) inputAddress.disabled = !isEditing;
+    if (inputLat) inputLat.disabled = !isEditing;
+    if (inputLng) inputLng.disabled = !isEditing;
     if (inputOwner) inputOwner.disabled = true;
+    detailMapPicker?.setEditable(isEditing);
     if (modalSaveBtn) modalSaveBtn.style.display = isEditing ? '' : 'none';
     if (modalEditBtn) modalEditBtn.textContent = isEditing ? '編集終了' : '編集';
   }
 
+  function updateDetailMapFromInputs() {
+    updateMap(inputLat?.value, inputLng?.value);
+  }
+
   function updateMap(latRaw, lngRaw) {
-    const lat = Number(latRaw);
-    const lng = Number(lngRaw);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      if (mapFrame) mapFrame.src = `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}&z=16&output=embed`;
-      if (coordsEl) coordsEl.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
-    } else {
-      if (mapFrame) mapFrame.removeAttribute('src');
-      if (coordsEl) coordsEl.textContent = 'lat: -, lng: -';
-    }
+    detailMapPicker?.setLatLng(latRaw, lngRaw, { center: true });
   }
 
   function getTypeNameById(id) {
@@ -414,6 +458,167 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+
+function createMapPickerController({ canvasEl, coordsEl, latInput, lngInput, editable = false, emptyZoom = 5 }) {
+  if (!canvasEl || typeof window.L === 'undefined') {
+    if (coordsEl) coordsEl.textContent = 'lat: -, lng: -';
+    return {
+      setLatLng() {},
+      invalidateSize() {},
+      setEditable() {},
+    };
+  }
+
+  const defaultCenter = [35.681236, 139.767125];
+  const map = L.map(canvasEl, {
+    zoomControl: true,
+    attributionControl: true,
+  }).setView(defaultCenter, emptyZoom);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(map);
+
+  const marker = L.marker(defaultCenter, {
+    interactive: false,
+    keyboard: false,
+    opacity: 0,
+    zIndexOffset: 1000,
+  }).addTo(map);
+
+  let hasValue = false;
+  let syncingFromMap = false;
+  let isEditable = !!editable;
+
+  function renderCoords(lat, lng) {
+    if (!coordsEl) return;
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      coordsEl.textContent = `lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`;
+    } else {
+      coordsEl.textContent = 'lat: -, lng: -';
+    }
+  }
+
+  function applyToInputs(lat, lng) {
+    if (latInput) latInput.value = Number.isFinite(lat) ? String(Number(lat).toFixed(7)) : '';
+    if (lngInput) lngInput.value = Number.isFinite(lng) ? String(Number(lng).toFixed(7)) : '';
+  }
+
+  function updateMarkerToCenter() {
+    if (!hasValue) return;
+    marker.setLatLng(map.getCenter());
+  }
+
+  function enableInteractions(next) {
+    isEditable = !!next;
+
+    if (isEditable) {
+      map.dragging.enable();
+      map.scrollWheelZoom.enable();
+      map.doubleClickZoom.enable();
+      map.boxZoom.enable();
+      map.keyboard.enable();
+      map.touchZoom.enable();
+      if (map.tap) map.tap.enable();
+    } else {
+      map.dragging.disable();
+      map.scrollWheelZoom.disable();
+      map.doubleClickZoom.disable();
+      map.boxZoom.disable();
+      map.keyboard.disable();
+      map.touchZoom.disable();
+      if (map.tap) map.tap.disable();
+    }
+
+    canvasEl.classList.toggle('is-disabled', !isEditable);
+    const zoomEl = map.zoomControl && map.zoomControl.getContainer ? map.zoomControl.getContainer() : null;
+    if (zoomEl) zoomEl.style.display = isEditable ? '' : 'none';
+  }
+
+  function commit(latRaw, lngRaw, { center = false } = {}) {
+    const lat = Number(latRaw);
+    const lng = Number(lngRaw);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      hasValue = true;
+      renderCoords(lat, lng);
+      applyToInputs(lat, lng);
+      const nextZoom = center ? Math.max(map.getZoom() || 16, 16) : (map.getZoom() || 16);
+      map.setView([lat, lng], nextZoom, { animate: false });
+      marker.setLatLng([lat, lng]);
+    } else {
+      hasValue = false;
+      renderCoords(null, null);
+      applyToInputs(null, null);
+      map.setView(defaultCenter, emptyZoom, { animate: false });
+    }
+  }
+
+  function syncFromCenter() {
+    if (!isEditable || !hasValue) return;
+    const center = map.getCenter();
+    syncingFromMap = true;
+    renderCoords(center.lat, center.lng);
+    applyToInputs(center.lat, center.lng);
+    marker.setLatLng(center);
+    syncingFromMap = false;
+  }
+
+  map.on('move', () => {
+    if (!hasValue) return;
+    updateMarkerToCenter();
+    syncFromCenter();
+  });
+
+  map.on('zoom', () => {
+    if (!hasValue) return;
+    updateMarkerToCenter();
+  });
+
+  if (latInput && lngInput) {
+    const onInput = () => {
+      if (syncingFromMap) return;
+      commit(latInput.value, lngInput.value, { center: true });
+    };
+    latInput.addEventListener('change', onInput);
+    lngInput.addEventListener('change', onInput);
+  }
+
+  setTimeout(() => map.invalidateSize(), 0);
+  renderCoords(null, null);
+  enableInteractions(isEditable);
+
+  return {
+    setLatLng(latRaw, lngRaw, options = {}) {
+      commit(latRaw, lngRaw, options);
+    },
+    invalidateSize() {
+      setTimeout(() => {
+        map.invalidateSize();
+        if (hasValue) {
+          marker.setLatLng(map.getCenter());
+          if (!isEditable) {
+            const latlng = marker.getLatLng();
+            map.panTo(latlng, { animate: false });
+          }
+        }
+      }, 60);
+    },
+    setEditable(next) {
+      enableInteractions(next);
+      if (hasValue) {
+        marker.setLatLng(map.getCenter());
+      }
+    },
+  };
+}
+
+
+
+function parseFiniteNumber(value) {
+  const num = Number(String(value ?? '').trim());
+  return Number.isFinite(num) ? num : null;
+}
 function formatPostalCode(value) {
   const digits = String(value || '').replace(/\D/g, '').slice(0, 7);
   if (digits.length <= 3) return digits;

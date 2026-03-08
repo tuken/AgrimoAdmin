@@ -47,7 +47,7 @@ async function findAuthContextByEmail(email) {
   let org = null;
   if (user.org_id) {
     const orgRows = await query(
-      'SELECT id, name, postal_code, address, note FROM orgs WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      'SELECT id, name, postal_code, address, note, latitude, longitude FROM orgs WHERE id = ? AND deleted_at IS NULL LIMIT 1',
       [user.org_id]
     );
     org = orgRows[0] || null;
@@ -78,6 +78,16 @@ async function findAuthContextByEmail(email) {
     org,
     fields: Array.isArray(fieldRows) ? fieldRows : [],
   };
+}
+
+
+async function findOrgById(orgId) {
+  if (!orgId) return null;
+  const rows = await query(
+    'SELECT id, name, postal_code, address, note, latitude, longitude FROM orgs WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+    [orgId]
+  );
+  return rows[0] || null;
 }
 
 async function findById(userId) {
@@ -141,6 +151,7 @@ async function updatePassword(userId, plainPassword) {
 module.exports = {
   toSafeUser,
   findById,
+  findOrgById,
   findByEmail,
   findAuthContextByEmail,
   verifyPassword,

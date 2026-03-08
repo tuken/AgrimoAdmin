@@ -1,7 +1,13 @@
 <%- include('../partials/head', { title: "圃場一覧", pageCss: "field", bodyClass: "" }) %>
 <%- include('../partials/header') %>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <% const isRole1 = (user && Number(user.role_id) === 1); %>
+<%
+  const initialOrgLat = (typeof orgLat !== 'undefined' && orgLat !== null) ? orgLat : ((user && user.org && (user.org.latitude ?? user.org.lat)) ?? '');
+  const initialOrgLng = (typeof orgLng !== 'undefined' && orgLng !== null) ? orgLng : ((user && user.org && (user.org.longitude ?? user.org.lon)) ?? '');
+%>
 
 <main>
 <div class="container">
@@ -69,7 +75,7 @@
           <div class="list-header-meta" id="list-header-meta">6件表示</div>
         </header>
 
-        <section class="fields-grid" id="fields-grid" data-user-id="<%= user && user.id ? user.id : '' %>">
+        <section class="fields-grid" id="fields-grid" data-user-id="<%= user && user.id ? user.id : '' %>" data-org-lat="<%= initialOrgLat %>" data-org-lng="<%= initialOrgLng %>">
           <div class="loading-message" id="fields-loading" style="display:none; padding: 16px; color:#6b7280;">圃場一覧を取得中…</div>
           <!-- 圃場カードは JavaScript で生成 -->
         </section>
@@ -103,12 +109,11 @@
       <!-- left: map (簡易) -->
       <div>
         <div class="field-modal-section-title">位置</div>
-        <div class="map-container" id="field-create-map-container">
-          <iframe class="map-frame" id="field-create-map-frame" title="圃場位置" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-          <div class="map-marker" id="field-create-map-marker" aria-label="位置マーカー"></div>
+        <div class="map-container">
+          <div class="map-canvas" id="field-create-map-canvas" aria-label="圃場位置"></div>
         </div>
         <div class="map-coords" id="field-create-map-coords">lat: -, lng: -</div>
-        <div class="field-hint" style="margin-top:10px; font-size:12px; color:#6b7280;">※緯度/経度を入力すると地図が更新されます</div>
+        <div class="field-hint map-hint">※中心のピンを目印に地図を動かすと、緯度/経度が自動更新されます</div>
       </div>
 
       <!-- right: form -->
@@ -208,11 +213,11 @@
       <!-- left: map / workers -->
       <div>
         <div class="field-modal-section-title">位置</div>
-        <div class="map-container" id="field-map-container">
-          <iframe class="map-frame" id="field-map-frame" title="圃場位置" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-          <div class="map-marker" id="field-map-marker" aria-label="位置マーカー"></div>
+        <div class="map-container">
+          <div class="map-canvas" id="field-map-canvas" aria-label="圃場位置"></div>
         </div>
         <div class="map-coords" id="field-map-coords">lat: -, lng: -</div>
+        <div class="field-hint map-hint">※詳細表示では地図は固定です。編集時のみ、中心のピンを目印に地図を動かして位置を微調整できます</div>
 
       </div>
 
@@ -255,6 +260,14 @@
         <div class="detail-form-group">
           <label class="detail-label">住所</label>
           <input class="detail-input" id="detail-address" type="text" disabled>
+        </div>
+
+        <div class="detail-form-group">
+          <label class="detail-label">緯度 / 経度</label>
+          <div class="detail-inline-row" style="gap:8px;">
+            <input class="detail-input" id="detail-lat" type="number" step="0.0000001" placeholder="lat" disabled>
+            <input class="detail-input" id="detail-lng" type="number" step="0.0000001" placeholder="lng" disabled>
+          </div>
         </div>
       </div>
     </div>
