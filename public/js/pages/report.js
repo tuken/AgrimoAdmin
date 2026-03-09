@@ -1038,9 +1038,6 @@ async function initLegacy(listRoot) {
 }
 
 async function fetchReports(listRoot, viewYear, viewMonth) {
-  const userIdRaw = listRoot?.dataset?.userId;
-  if (!userIdRaw) return [];
-
   const y = Number.isFinite(Number(viewYear)) ? Number(viewYear) : new Date().getFullYear();
   const m = Number.isFinite(Number(viewMonth)) ? Number(viewMonth) : new Date().getMonth();
   const startDate = formatDate(new Date(y, m, 1));
@@ -1048,8 +1045,8 @@ async function fetchReports(listRoot, viewYear, viewMonth) {
 
   const queries = [
     `
-      query FindWorkReportsWithUserID($userID: ID!, $startDate: Date!, $endDate: Date!) {
-        findWorkReportsWithUserID(userID: $userID, startDate: $startDate, endDate: $endDate) {
+      query FindWorkReports($startDate: Date!, $endDate: Date!) {
+        findWorkReports(startDate: $startDate, endDate: $endDate) {
           id
           workDate
           workHours
@@ -1085,8 +1082,8 @@ async function fetchReports(listRoot, viewYear, viewMonth) {
       }
     `,
     `
-      query FindWorkReportsWithUserID($userID: ID!, $startDate: Date!, $endDate: Date!) {
-        findWorkReportsWithUserID(userID: $userID, startDate: $startDate, endDate: $endDate) {
+      query FindWorkReports($startDate: Date!, $endDate: Date!) {
+        findWorkReports(startDate: $startDate, endDate: $endDate) {
           id
           workDate
           workHours
@@ -1120,7 +1117,6 @@ async function fetchReports(listRoot, viewYear, viewMonth) {
   ];
 
   const variables = {
-    userID: String(userIdRaw),
     startDate,
     endDate,
   };
@@ -1128,8 +1124,8 @@ async function fetchReports(listRoot, viewYear, viewMonth) {
   let lastError = null;
   for (const q of queries) {
     const result = await window.gql(q, variables);
-    const reports = Array.isArray(result.data?.findWorkReportsWithUserID)
-      ? result.data.findWorkReportsWithUserID
+    const reports = Array.isArray(result.data?.findWorkReports)
+      ? result.data.findWorkReports
       : [];
 
     if (!result.errors) {

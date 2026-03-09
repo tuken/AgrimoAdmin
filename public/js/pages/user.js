@@ -979,7 +979,7 @@ ${err.message || err}`);
     const passwordGroup = qs('#detail-user-password-group');
     const isEditing = btnSave && btnSave.style.display !== 'none';
     if (farmGroup) farmGroup.style.display = isOwner ? '' : 'none';
-    if (passwordGroup) passwordGroup.style.display = 'none';
+    if (passwordGroup) passwordGroup.style.display = isEditing ? '' : 'none';
     if (detailOwnerWrapper) detailOwnerWrapper.style.display = isOwner ? 'none' : '';
     if (detailOwnerSelect) detailOwnerSelect.disabled = true;
     const selector = qs('#detail-field-selector');
@@ -990,7 +990,7 @@ ${err.message || err}`);
     const disabled = !isEdit;
     [detailUserFarmName, detailUserLastName, detailUserFirstName, detailUserEmail, detailUserPostalCode, detailUserAddress, detailUserGender, detailUserBirthday, detailUserNote, detailLastLogin, detailCreatedAt]
       .forEach(el => { if (!el) return; el.disabled = disabled; });
-    if (detailUserPassword) detailUserPassword.disabled = true;
+    if (detailUserPassword) detailUserPassword.disabled = disabled;
     if (detailOwnerSelect) detailOwnerSelect.disabled = true;
 
     if (detailLastLogin) detailLastLogin.disabled = true;
