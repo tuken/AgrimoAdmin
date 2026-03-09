@@ -116,6 +116,70 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   }
 
+  function todayDateOnly() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  function clampBirthdayValue(input) {
+    if (!input) return;
+    const min = String(input.min || '1900-01-01');
+    const max = String(input.max || todayDateOnly());
+    if (!input.value) return;
+    if (input.value < min) {
+      input.value = min;
+      return;
+    }
+    if (input.value > max) {
+      input.value = max;
+    }
+  }
+
+  function bindBirthdayPickerGuard(input) {
+    if (!input) return;
+    input.min = input.min || '1900-01-01';
+    input.max = input.max || todayDateOnly();
+    input.setAttribute('autocomplete', 'bday');
+
+    const openPicker = () => {
+      if (input.disabled) return;
+      if (typeof input.showPicker === 'function') {
+        try { input.showPicker(); } catch (_) {}
+      }
+    };
+
+    input.addEventListener('focus', () => {
+      setTimeout(openPicker, 0);
+    });
+
+    input.addEventListener('click', () => {
+      openPicker();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      const key = e.key;
+      if (key === 'Tab' || key === 'Shift' || key === 'Escape') return;
+      if (key === 'Enter' || key === ' ' || key === 'ArrowDown') {
+        e.preventDefault();
+        openPicker();
+        return;
+      }
+      if (key.startsWith('Arrow') || key === 'Home' || key === 'End' || key === 'PageUp' || key === 'PageDown') return;
+      e.preventDefault();
+    });
+
+    input.addEventListener('beforeinput', (e) => {
+      if (input.disabled) return;
+      e.preventDefault();
+    });
+
+    input.addEventListener('paste', (e) => e.preventDefault());
+    input.addEventListener('drop', (e) => e.preventDefault());
+    input.addEventListener('change', () => clampBirthdayValue(input));
+    input.addEventListener('blur', () => clampBirthdayValue(input));
+  }
+
   function clearUserSections() {
     qsa('.worker-card', userList).forEach((el) => el.remove());
   }
@@ -515,6 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const newUserNote = qs('#new-user-note');
   const newUserOwner = qs('#new-user-owner');
 
+  bindBirthdayPickerGuard(newUserBirthday);
   bindZipcodeAutoFill(newUserPostalCode, newUserAddress);
   const ownerSelectWrapper = qs('#owner-select-wrapper');
   const ownerSelect = qs('#new-user-owner-select');
@@ -754,6 +819,20 @@ document.addEventListener('DOMContentLoaded', () => {
     return result?.data?.updateUser || null;
   }
 
+  async function deleteUserMutation(id) {
+    const query = `
+      mutation DeleteUser($id: ID!) {
+        deleteUser(id: $id) {
+          id
+        }
+      }
+    `;
+    const result = await window.gql(query, { id: String(id) });
+    if (result?.errors?.length) throw new Error(result.errors[0]?.message || 'Failed to delete user');
+    return result?.data?.deleteUser || null;
+  }
+
+
   function buildWorkerCard({ id, farmName = '', name, lastName = '', firstName = '', email, isOwner, ownerId = '', fields, postalCode = '', address = '', gender = '', birthday = '', note = '', lastLogin, createdAt }) {
     const roleLabel = isOwner ? 'OWNER' : 'WORKER';
     const sectionSelector = isOwner ? '[data-section="owner"]' : '[data-section="worker"]';
@@ -907,6 +986,7 @@ ${err.message || err}`);
   const detailUserNote = qs('#detail-user-note');
   const detailUserOwner = qs('#detail-user-owner');
 
+  bindBirthdayPickerGuard(detailUserBirthday);
   bindZipcodeAutoFill(detailUserPostalCode, detailUserAddress);
   const detailOwnerWrapper = qs('#detail-owner-select-wrapper');
   const detailOwnerSelect = qs('#detail-user-owner-select');
@@ -1280,13 +1360,34 @@ ${err.message || err}`);
   }
 
   if (btnDelete) {
-    btnDelete.addEventListener('click', () => {
+    btnDelete.addEventListener('click', async () => {
       if (!activeCard) return;
-      if (!confirm('この作業者を削除しますか？（ダミー）')) return;
-      activeCard.remove();
-      closeDetail();
-      filteredCards = getAllCards();
-      applyUserSearch();
+      const targetId = String(activeCard.dataset.userId || '').trim();
+      if (!targetId) {
+        alert('削除対象のユーザーIDを取得できませんでした。');
+        return;
+      }
+      if (!confirm('このユーザーを削除しますか？')) return;
+
+      const oldDisabled = btnDelete.disabled;
+      btnDelete.disabled = true;
+      try {
+        await deleteUserMutation(targetId);
+        activeCard.remove();
+        closeDetail();
+        filteredCards = getAllCards();
+        applyUserSearch();
+        updateUserCount(filteredCards.length);
+        syncNewUserSelects();
+        syncDetailSelects();
+        alert('削除しました。');
+      } catch (err) {
+        console.error('Failed to delete user:', err);
+        alert(`削除に失敗しました。
+${err.message || err}`);
+      } finally {
+        btnDelete.disabled = oldDisabled;
+      }
     });
   }
 

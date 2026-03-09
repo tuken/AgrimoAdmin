@@ -292,7 +292,7 @@
           削除
         </button>
         <% if (!isRole1) { %>
-          <button class="btn-primary" type="button" id="detail-edit">
+          <button class="btn-primary btn-main-green" type="button" id="detail-edit">
             <span class="btn-icon">✏</span>
             編集
           </button>
@@ -540,7 +540,11 @@
       <div class="detail-footer-left" id="edit-message"></div>
       <div class="detail-footer-right">
         <button class="btn-secondary" type="button" id="edit-cancel" data-modal-close>キャンセル</button>
-        <button class="btn-primary" type="button" id="edit-save">
+        <button class="btn-danger" type="button" id="edit-delete">
+          <span class="icon">🗑</span>
+          削除
+        </button>
+        <button class="btn-primary btn-main-green" type="button" id="edit-save">
           <span class="btn-icon">💾</span>
           保存する
         </button>

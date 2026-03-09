@@ -135,7 +135,7 @@
           </div>
           <div class="detail-form-group">
             <label class="detail-label" for="new-user-birthday">生年月日</label>
-            <input id="new-user-birthday" class="detail-input" type="date">
+            <input id="new-user-birthday" class="detail-input" type="date" min="1900-01-01" max="<%= new Date().toISOString().slice(0,10) %>">
           </div>
           <div class="detail-form-group" style="grid-column:1/-1;">
             <label class="detail-label" for="new-user-note">備考</label>
@@ -229,7 +229,7 @@
           </div>
           <div class="detail-form-group">
             <label class="detail-label" for="detail-user-birthday">生年月日</label>
-            <input id="detail-user-birthday" class="detail-input" type="date" disabled>
+            <input id="detail-user-birthday" class="detail-input" type="date" min="1900-01-01" max="<%= new Date().toISOString().slice(0,10) %>" disabled>
           </div>
           <div class="detail-form-group" style="grid-column:1/-1;">
             <label class="detail-label" for="detail-user-note">備考</label>

@@ -89,6 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const editForm = document.querySelector('#report-edit-form');
   const createSaveBtn = document.querySelector('#new-save');
   const editSaveBtn = document.querySelector('#edit-save');
+  const editDeleteBtn = document.querySelector('#edit-delete');
 
   const createMsg = document.querySelector('#new-message');
   const editMsg = document.querySelector('#edit-message');
@@ -442,6 +443,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('[report] updateWorkReport failed:', err);
         setMessage(editMsg, err.message || '日報の更新に失敗しました', 'error');
       } finally {
+        if (editSaveBtn) editSaveBtn.disabled = false;
+      }
+    });
+  }
+
+  // 編集削除
+  if (editDeleteBtn) {
+    editDeleteBtn.addEventListener('click', async function () {
+      const current = selectedCard ? readCardData(selectedCard) : null;
+      const targetId = String(qs('#edit-target-id', editForm)?.value || current?.id || '').trim();
+      if (!targetId) {
+        setMessage(editMsg, '対象の日報が見つかりません', 'error');
+        return;
+      }
+
+      const ok = window.confirm('この日報を削除します。よろしいですか？');
+      if (!ok) return;
+
+      editDeleteBtn.disabled = true;
+      if (editSaveBtn) editSaveBtn.disabled = true;
+      setMessage(editMsg, '', '');
+
+      try {
+        await deleteWorkReportViaGraphQL(targetId);
+
+        if (selectedCard && selectedCard.parentNode) {
+          selectedCard.parentNode.removeChild(selectedCard);
+        }
+        cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : cards;
+        selectedCard = null;
+
+        closeModal(editModal);
+        closeModal(detailModal);
+        rerender({ resetPage: false });
+      } catch (err) {
+        console.error('[report] deleteWorkReport failed:', err);
+        setMessage(editMsg, err.message || '日報の削除に失敗しました', 'error');
+      } finally {
+        editDeleteBtn.disabled = false;
         if (editSaveBtn) editSaveBtn.disabled = false;
       }
     });
@@ -1457,6 +1497,22 @@ async function updateWorkReportViaGraphQL(formEl, data) {
   }
 
   return result?.data?.updateWorkReport || null;
+}
+
+async function deleteWorkReportViaGraphQL(id) {
+  const mutation = `
+    mutation DeleteWorkReport($id: ID!) {
+      deleteWorkReport(id: $id) {
+        id
+      }
+    }
+  `;
+
+  const result = await window.gql(mutation, { id: String(id || '').trim() });
+  if (result?.errors?.length) {
+    throw new Error(result.errors[0]?.message || '日報の削除に失敗しました');
+  }
+  return result?.data?.deleteWorkReport || null;
 }
 
 function mergeUpdatedReportIntoCardData(data, updated, previous) {

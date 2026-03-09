@@ -170,24 +170,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     setEditing(!isEditing);
   });
 
-  modalSaveBtn?.addEventListener('click', () => {
+  modalSaveBtn?.addEventListener('click', async () => {
     const field = fields.find((x) => String(x.id) === String(currentFieldId));
     if (!field) return;
 
-    field.name = inputName.value.trim();
-    field.area = inputArea ? String(inputArea.value || '').trim() : field.area;
-    field.fieldTypeID = inputType.value || '';
-    field.fieldTypeName = getTypeNameById(field.fieldTypeID) || inputType.options[inputType.selectedIndex]?.text || '';
-    field.fieldStateID = inputStatus.value || '';
-    field.fieldStateDescription = getStateDescriptionById(field.fieldStateID) || inputStatus.options[inputStatus.selectedIndex]?.text || '';
-    field.postalCode = inputPostal.value.trim();
-    field.address = inputAddress.value.trim();
-    field.latitude = Number(String(inputLat?.value || '').trim());
-    field.longitude = Number(String(inputLng?.value || '').trim());
+    const payload = buildUpdateFieldInput(field);
+    const validationError = validateUpdateFieldInput(payload);
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
 
-    render();
-    openModal(field);
-    setEditing(false);
+    const originalLabel = modalSaveBtn.textContent;
+    modalSaveBtn.disabled = true;
+    modalSaveBtn.textContent = '保存中...';
+
+    try {
+      const updated = await updateFieldMutation(field.id, payload);
+      const normalized = normalizeField(updated || {});
+      const nextField = normalized.id ? { ...field, ...normalized } : { ...field, ...payload };
+      const index = fields.findIndex((x) => String(x.id) === String(field.id));
+      if (index >= 0) fields[index] = nextField;
+      applyFilter();
+      openModal(nextField);
+      setEditing(false);
+      alert('圃場を更新しました。');
+    } catch (err) {
+      console.error('圃場更新に失敗しました:', err);
+      alert(err?.message || '圃場更新に失敗しました。');
+    } finally {
+      modalSaveBtn.disabled = false;
+      modalSaveBtn.textContent = originalLabel || '保存';
+    }
   });
 
 
@@ -255,6 +269,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     return input;
   }
 
+  function buildUpdateFieldInput(field) {
+    const lat = Number(String(inputLat?.value || '').trim());
+    const lng = Number(String(inputLng?.value || '').trim());
+    const areaRaw = String(inputArea?.value || '').trim();
+    const area = Number(areaRaw);
+    const current = field || {};
+
+    const input = {
+      userID: String(current.ownerID || '').trim(),
+      fieldTypeID: String(inputType?.value || current.fieldTypeID || '').trim(),
+      fieldStateID: String(inputStatus?.value || current.fieldStateID || '').trim(),
+      name: String(inputName?.value || '').trim(),
+      latitude: Number.isFinite(lat) ? lat : null,
+      longitude: Number.isFinite(lng) ? lng : null,
+      postalCode: String(inputPostal?.value || '').trim(),
+      address: String(inputAddress?.value || '').trim(),
+      note: String(current.note || '').trim() || '　',
+    };
+
+    if (current.fieldCode) input.fieldCode = String(current.fieldCode).trim();
+    if (areaRaw !== '' && Number.isFinite(area)) input.area = area;
+
+    return input;
+  }
+
   function validateCreateFieldInput(input) {
     if (!input.userID) return 'オーナーを選択してください。';
     if (!input.fieldTypeID) return '種別を選択してください。';
@@ -265,6 +304,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!input.postalCode) return '郵便番号を入力してください。';
     if (!input.address) return '住所を入力してください。';
     return '';
+  }
+
+  function validateUpdateFieldInput(input) {
+    return validateCreateFieldInput(input);
   }
 
   async function handlePostalLookup() {
@@ -861,6 +904,61 @@ async function fetchFieldStates() {
   return data.fieldStates || [];
 }
 
+
+async function updateFieldMutation(id, input) {
+  const query = `
+    mutation UpdateField($id: ID!, $input: UpdateFieldInput!) {
+      updateField(id: $id, input: $input) {
+        id
+        fieldCode
+        name
+        latitude
+        longitude
+        area
+        postalCode
+        address
+        note
+        user {
+          id
+          farmName
+          firstName
+          lastName
+          email
+        }
+        fieldType {
+          id
+          name
+        }
+        fieldState {
+          id
+          name
+          description
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    id: String(id),
+    input: {
+      userID: String(input.userID),
+      fieldTypeID: String(input.fieldTypeID),
+      fieldStateID: String(input.fieldStateID),
+      name: String(input.name),
+      latitude: Number(input.latitude),
+      longitude: Number(input.longitude),
+      postalCode: String(input.postalCode),
+      address: String(input.address),
+    }
+  };
+
+  if (input.fieldCode) variables.input.fieldCode = String(input.fieldCode);
+  if (Number.isFinite(input.area)) variables.input.area = Number(input.area);
+  if (input.note) variables.input.note = String(input.note);
+
+  const data = await gqlPost(query, variables);
+  return data.updateField || null;
+}
 
 async function createFieldMutation(input) {
   const query = `
