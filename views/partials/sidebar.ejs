@@ -1,8 +1,12 @@
+<%
+  const currentRoleId = Number(user && (user.role_id ?? user.roleId ?? user.roleID ?? user.role_type ?? user.roleType));
+  const canViewAdminMenus = Number.isFinite(currentRoleId) ? currentRoleId < 3 : true;
+%>
 <aside class="app-sidebar">
   <nav class="app-nav">
     <a class="app-nav__item" href="/top">トップ</a>
-    <a class="app-nav__item" href="/field_list">圃場一覧</a>
+    <% if (canViewAdminMenus) { %><a class="app-nav__item" href="/field_list">圃場一覧</a><% } %>
     <a class="app-nav__item" href="/report_list">日報一覧</a>
-    <a class="app-nav__item" href="/user_list">ユーザー一覧</a>
+    <% if (canViewAdminMenus) { %><a class="app-nav__item" href="/user_list">ユーザー一覧</a><% } %>
   </nav>
 </aside>

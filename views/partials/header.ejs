@@ -11,6 +11,8 @@
       // currentPath is set in app middleware: res.locals.currentPath = req.path
       const p = (typeof currentPath !== 'undefined' && currentPath) ? currentPath : '';
       const isActive = (route) => p === route || (route !== '/top' && p.startsWith(route + '/'));
+      const currentRoleId = Number(user && (user.role_id ?? user.roleId ?? user.roleID ?? user.role_type ?? user.roleType));
+      const canViewAdminMenus = Number.isFinite(currentRoleId) ? currentRoleId < 3 : true;
     %>
 
     <nav class="nav">
@@ -21,6 +23,7 @@
         <span>トップ</span>
       </a>
 
+      <% if (canViewAdminMenus) { %>
       <a href="/field_list" class="nav-item <%= isActive('/field_list') ? 'active' : '' %>">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M12 21s-6-5.5-6-10a6 6 0 1112 0c0 4.5-6 10-6 10z"/>
@@ -28,6 +31,7 @@
         </svg>
         <span>圃場一覧</span>
       </a>
+      <% } %>
 
       <a href="/report_list" class="nav-item <%= isActive('/report_list') ? 'active' : '' %>">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -37,6 +41,7 @@
         <span>日報一覧</span>
       </a>
 
+      <% if (canViewAdminMenus) { %>
       <a href="/user_list" class="nav-item <%= isActive('/user_list') ? 'active' : '' %>">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <circle cx="9" cy="8" r="4"/>
@@ -46,6 +51,7 @@
         </svg>
         <span>ユーザー一覧</span>
       </a>
+      <% } %>
     </nav>
 
     <div class="header-right">
