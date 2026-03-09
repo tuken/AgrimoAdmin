@@ -408,7 +408,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 編集保存
   if (editForm) {
-    editForm.addEventListener('submit', function (e) {
+    editForm.addEventListener('submit', async function (e) {
       e.preventDefault();
       setMessage(editMsg, '', '');
 
@@ -417,19 +417,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      const fd = new FormData(editForm);
-      const data = normalizeFormData(fd, editForm);
+      if (editSaveBtn) editSaveBtn.disabled = true;
 
-      if (!data.date || !data.task || !data.owner || !data.field) {
-        setMessage(editMsg, '必須項目を入力してください', 'error');
-        return;
+      try {
+        const fd = new FormData(editForm);
+        const data = normalizeFormData(fd, editForm);
+        data.id = String(qs('#edit-target-id', editForm)?.value || readCardData(selectedCard)?.id || '').trim();
+
+        const errorMessage = validateUpdateWorkReportData(data);
+        if (errorMessage) {
+          setMessage(editMsg, errorMessage, 'error');
+          return;
+        }
+
+        const updated = await updateWorkReportViaGraphQL(editForm, data);
+        const merged = mergeUpdatedReportIntoCardData(data, updated, readCardData(selectedCard));
+
+        applyCardUpdate(selectedCard, merged);
+        cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : cards;
+
+        closeModal(editModal);
+        rerender({ resetPage: false });
+      } catch (err) {
+        console.error('[report] updateWorkReport failed:', err);
+        setMessage(editMsg, err.message || '日報の更新に失敗しました', 'error');
+      } finally {
+        if (editSaveBtn) editSaveBtn.disabled = false;
       }
-
-      applyCardUpdate(selectedCard, data);
-      cards = grid ? Array.from(grid.querySelectorAll('[data-report]')) : cards;
-
-      closeModal(editModal);
-      rerender({ resetPage: false });
     });
   }
 
@@ -1377,6 +1391,124 @@ function buildHoursBadge(value) {
   return `⏱ ${formatHoursLabel(value)}h`;
 }
 
+
+
+function buildUpdateWorkReportInput(data) {
+  const rawHours = String(data.hours == null ? '' : data.hours).trim();
+  const parsedHours = rawHours === '' ? 0 : Number(rawHours);
+  const workDetail = String(data.memo == null ? '' : data.memo).trim();
+
+  const input = {
+    fieldID: String(data.fieldId || '').trim() || null,
+    workDate: String(data.date || '').trim() || null,
+    workHours: Number.isFinite(parsedHours) ? parsedHours : 0,
+    workTypeID: String(data.taskId || '').trim() || null,
+    cropVarietyID: String(data.cropVarietyId || '').trim() || null,
+    weatherCode: data.weatherCode === '' || data.weatherCode == null ? null : Number(data.weatherCode),
+    workDetail,
+  };
+
+  return input;
+}
+
+function validateUpdateWorkReportData(data) {
+  if (!String(data.id || '').trim()) return '対象の日報が見つかりません';
+  return validateCreateWorkReportData(data);
+}
+
+async function updateWorkReportViaGraphQL(formEl, data) {
+  const mutation = `
+    mutation UpdateWorkReport($id: ID!, $input: UpdateWorkReportInput!) {
+      updateWorkReport(id: $id, input: $input) {
+        id
+        workDate
+        workHours
+        workDetail
+        imageURL
+        field { id name }
+        workType { id name }
+        cropVariety {
+          id
+          name
+          cropItem { id name }
+        }
+        weather { code japanese }
+        user {
+          id
+          firstName
+          lastName
+          email
+        }
+      }
+    }
+  `;
+
+  const id = String(data.id || '').trim();
+  const input = buildUpdateWorkReportInput(data);
+  const fileInput = qs('#edit-image-file', formEl);
+  const file = fileInput?.files?.[0] || null;
+
+  let result;
+  if (file) {
+    input.image = null;
+    result = await window.gqlMultipart(mutation, { id, input }, { 'input.image': file });
+  } else {
+    result = await window.gql(mutation, { id, input });
+  }
+
+  if (result?.errors?.length) {
+    throw new Error(result.errors[0]?.message || '日報の更新に失敗しました');
+  }
+
+  return result?.data?.updateWorkReport || null;
+}
+
+function mergeUpdatedReportIntoCardData(data, updated, previous) {
+  const report = updated || {};
+  const prev = previous || {};
+  const ownerName = [String(report?.user?.lastName || '').trim(), String(report?.user?.firstName || '').trim()].filter(Boolean).join(' ') || String(prev.owner || data.owner || '');
+  const ownerId = String(report?.user?.id || prev.ownerId || data.ownerId || '');
+  const cropItemId = String(report?.cropVariety?.cropItem?.id || data.cropItemId || prev.cropItemId || '');
+  const cropItemName = String(report?.cropVariety?.cropItem?.name || data.cropItemName || prev.cropItemName || '');
+  const cropVarietyName = String(report?.cropVariety?.name || data.cropVarietyName || prev.cropVarietyName || '');
+  const fieldName = String(report?.field?.name || data.field || prev.field || '');
+  const taskName = String(report?.workType?.name || data.task || prev.task || '');
+  const memo = String(report?.workDetail || data.memo || prev.memo || '');
+  const weatherName = String(report?.weather?.japanese || data.weatherName || prev.weatherName || '');
+
+  return {
+    ...prev,
+    ...data,
+    id: String(report?.id || data.id || prev.id || ''),
+    date: String(report?.workDate || data.date || prev.date || ''),
+    hours: report?.workHours != null ? String(report.workHours) : String(data.hours || prev.hours || ''),
+    time: report?.workHours != null ? `${report.workHours}h` : (data.time || prev.time || ''),
+    memo,
+    imageUrl: String(report?.imageURL || data.imageUrl || prev.imageUrl || ''),
+    taskId: String(report?.workType?.id || data.taskId || prev.taskId || ''),
+    task: taskName,
+    fieldId: String(report?.field?.id || data.fieldId || prev.fieldId || ''),
+    field: fieldName,
+    owner: ownerName,
+    ownerId,
+    cropItemId,
+    cropItemName,
+    cropVarietyId: String(report?.cropVariety?.id || data.cropVarietyId || prev.cropVarietyId || ''),
+    cropVarietyName,
+    weatherCode: report?.weather?.code != null ? String(report.weather.code) : String(data.weatherCode || prev.weatherCode || ''),
+    weatherName,
+    title: String(memo.split(/\r?\n/)[0].trim().slice(0, 60) || data.title || prev.title || ''),
+    text: [
+      taskName,
+      cropItemName,
+      cropVarietyName,
+      fieldName,
+      ownerName,
+      memo,
+      weatherName,
+    ].filter(Boolean).join(' '),
+  };
+}
 
 function buildCreateWorkReportInput(data) {
   const rawHours = String(data.hours == null ? '' : data.hours).trim();

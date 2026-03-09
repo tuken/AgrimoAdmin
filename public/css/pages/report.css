@@ -946,6 +946,36 @@
   min-width: 0;
 }
 
+.panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text-main);
+}
+
+.panel-title-icon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: #4f46e5;
+  background: linear-gradient(180deg, rgba(79, 70, 229, 0.12), rgba(79, 70, 229, 0.06));
+  border: 1px solid rgba(79, 70, 229, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+  flex: 0 0 auto;
+}
+
+.panel-title-icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
 .calendar-nav {
   margin-left: auto;           /* 右端に寄せる */
   display: inline-flex;
@@ -976,6 +1006,22 @@
   .calendar-card {
     overflow-x: visible;
     overflow-y: visible;   /* もしくは overflow: unset; でもOK */
+  }
+
+  .panel-title {
+    gap: 8px;
+    font-size: 0.98rem;
+  }
+
+  .panel-title-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+  }
+
+  .panel-title-icon svg {
+    width: 15px;
+    height: 15px;
   }
 
   /* ついでに少し詰めておくと収まりが良くなる */
@@ -1184,12 +1230,25 @@
   background: linear-gradient(180deg, #f8fafc 0%, #f3f4f6 100%);
 }
 
+.detail-image-wrapper--optional img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+}
+
 .detail-image-wrapper--optional.is-empty img {
-  display: none;
+  display: none !important;
+}
+
+.detail-image-wrapper--optional:not(.is-empty) .detail-image-placeholder {
+  display: none !important;
 }
 
 .detail-image-placeholder {
   display: flex;
+  width: 100%;
+  min-height: 140px;
   flex-direction: column;
   align-items: center;
   justify-content: center;

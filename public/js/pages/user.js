@@ -718,6 +718,42 @@ document.addEventListener('DOMContentLoaded', () => {
     return result?.data?.createUser || null;
   }
 
+
+  async function updateUserMutation(id, input) {
+    const query = `
+      mutation UpdateUser($id: ID!, $input: UpdateUserInput!) {
+        updateUser(id: $id, input: $input) {
+          id
+          farmName
+          firstName
+          lastName
+          email
+          postalCode
+          address
+          gender
+          birthday
+          note
+          createdAt
+          lastLoginAt
+          parent {
+            id
+            farmName
+            lastName
+            firstName
+            email
+          }
+          fields {
+            id
+            name
+          }
+        }
+      }
+    `;
+    const result = await window.gql(query, { id: String(id), input });
+    if (result?.errors?.length) throw new Error(result.errors[0]?.message || 'Failed to update user');
+    return result?.data?.updateUser || null;
+  }
+
   function buildWorkerCard({ id, farmName = '', name, lastName = '', firstName = '', email, isOwner, ownerId = '', fields, postalCode = '', address = '', gender = '', birthday = '', note = '', lastLogin, createdAt }) {
     const roleLabel = isOwner ? 'OWNER' : 'WORKER';
     const sectionSelector = isOwner ? '[data-section="owner"]' : '[data-section="worker"]';
@@ -1102,7 +1138,7 @@ ${err.message || err}`);
   }
 
   if (btnSave) {
-    btnSave.addEventListener('click', () => {
+    btnSave.addEventListener('click', async () => {
       if (!activeCard) return;
 
       const farmName = (detailUserFarmName?.value || '').trim();
@@ -1122,86 +1158,124 @@ ${err.message || err}`);
 
       const isOwner = !!detailUserOwner?.checked;
       const ownerId = originalSnapshot?.ownerId || String(detailOwnerSelect?.value || '').trim();
-      const postalCode = (detailUserPostalCode?.value || '').trim();
+      const postalCode = normalizeZipcode(detailUserPostalCode?.value || '');
       const address = (detailUserAddress?.value || '').trim();
       const gender = normalizeGender(detailUserGender?.value);
       const birthday = normalizeDateOnly(detailUserBirthday?.value);
       const note = (detailUserNote?.value || '').trim();
 
-      // update dataset
-      activeCard.dataset.farmName = farmName;
-      activeCard.dataset.name = name;
-      activeCard.dataset.lastName = lastName;
-      activeCard.dataset.firstName = firstName;
-      activeCard.dataset.email = email;
-      activeCard.dataset.owner = isOwner ? 'はい' : 'いいえ';
-      activeCard.dataset.ownerId = isOwner ? '' : ownerId;
-      activeCard.dataset.fields = detailSelectedFields.map((f) => typeof f === 'string' ? f : (f?.name || '')).filter(Boolean).join(',');
-      activeCard.dataset.fieldIds = detailSelectedFields.map((f) => typeof f === 'string' ? '' : (f?.id || '')).join(',');
-      activeCard.dataset.postalCode = postalCode;
-      activeCard.dataset.address = address;
-      activeCard.dataset.gender = gender;
-      activeCard.dataset.birthday = birthday;
-      activeCard.dataset.note = note;
-
-      // update visible UI
-      const nameEl = qs('.worker-name', activeCard);
-      const emailEl = qs('.worker-email', activeCard);
-      const farmNameEl = qs('.worker-company-name', activeCard);
-      const farmWrapEl = qs('.worker-company', activeCard);
-      const rolePill = qs('.worker-role-pill', activeCard);
-      const fieldsWrap = qs('.worker-fields', activeCard);
-
-      if (nameEl) nameEl.textContent = name;
-      if (emailEl) emailEl.textContent = email;
-      if (farmNameEl) farmNameEl.textContent = isOwner ? (farmName || '—') : '—';
-      if (farmWrapEl) farmWrapEl.classList.toggle('is-empty', !(isOwner && farmName));
-      if (farmWrapEl) farmWrapEl.style.display = isOwner ? '' : 'none';
-      if (rolePill) rolePill.textContent = isOwner ? 'OWNER' : 'WORKER';
-      if (fieldsWrap) {
-        fieldsWrap.innerHTML = detailSelectedFields.map(f => `<span class="worker-field-chip">${escapeHtml(typeof f === 'string' ? f : (f?.name || ''))}</span>`).join('');
-      }
-
-      // move section if owner flag changed
-      const currentSection = activeCard.closest('.user-section')?.dataset?.section;
-      const targetSection = isOwner ? 'owner' : 'worker';
-      if (currentSection && currentSection !== targetSection) {
-        const section = qs(`[data-section="${targetSection}"]`, userList);
-        const heading = section ? qs('h2', section) : null;
-        if (section && heading && heading.nextElementSibling) {
-          section.insertBefore(activeCard, heading.nextElementSibling);
-        } else if (section) {
-          section.appendChild(activeCard);
-        }
-      }
-
-      // refresh selects (owner list may have changed)
-      syncNewUserSelects();
-      syncDetailSelects();
-
-      originalSnapshot = {
-        userId: activeCard.dataset.userId || '',
-        farmName,
-        name,
-        lastName,
-        firstName,
+      const input = {
         email,
-        owner: isOwner ? 'はい' : 'いいえ',
-        ownerId: isOwner ? '' : ownerId,
-        fields: detailSelectedFields.slice(),
-        postalCode,
-        address,
-        gender,
-        birthday,
-        note,
-        lastLogin: activeCard.dataset.lastLogin || '-',
-        createdAt: activeCard.dataset.createdAt || '-'
+        firstName,
+        lastName,
       };
+      if (isOwner) input.farmName = farmName;
+      if (password) input.password = password;
+      if (postalCode) input.postalCode = postalCode;
+      if (address) input.address = address;
+      if (gender) input.gender = gender;
+      if (birthday) input.birthday = birthday;
+      if (note) input.note = note;
 
-      // refresh search/pagination
-      applyUserSearch();
-      setDetailEditMode(false);
-      alert('保存しました。（ダミー）');
+      const oldDisabled = btnSave.disabled;
+      btnSave.disabled = true;
+      try {
+        const updatedUser = await updateUserMutation(activeCard.dataset.userId, input);
+        const updatedFarmName = isOwner
+          ? String(updatedUser?.farmName || farmName || '').trim()
+          : farmName;
+        const updatedLastName = String(updatedUser?.lastName || lastName || '').trim();
+        const updatedFirstName = String(updatedUser?.firstName || firstName || '').trim();
+        const updatedName = `${updatedLastName} ${updatedFirstName}`.trim();
+        const updatedEmail = String(updatedUser?.email || email || '').trim();
+        const updatedPostalCode = String(updatedUser?.postalCode || postalCode || '').trim();
+        const updatedAddress = String(updatedUser?.address || address || '').trim();
+        const updatedGender = normalizeGender(updatedUser?.gender || gender);
+        const updatedBirthday = normalizeDateOnly(updatedUser?.birthday || birthday);
+        const updatedNote = String(updatedUser?.note || note || '').trim();
+
+        // update dataset
+        activeCard.dataset.farmName = updatedFarmName;
+        activeCard.dataset.name = updatedName;
+        activeCard.dataset.lastName = updatedLastName;
+        activeCard.dataset.firstName = updatedFirstName;
+        activeCard.dataset.email = updatedEmail;
+        activeCard.dataset.owner = isOwner ? 'はい' : 'いいえ';
+        activeCard.dataset.ownerId = isOwner ? '' : ownerId;
+        activeCard.dataset.fields = detailSelectedFields.map((f) => typeof f === 'string' ? f : (f?.name || '')).filter(Boolean).join(',');
+        activeCard.dataset.fieldIds = detailSelectedFields.map((f) => typeof f === 'string' ? '' : (f?.id || '')).join(',');
+        activeCard.dataset.postalCode = updatedPostalCode;
+        activeCard.dataset.address = updatedAddress;
+        activeCard.dataset.gender = updatedGender;
+        activeCard.dataset.birthday = updatedBirthday;
+        activeCard.dataset.note = updatedNote;
+
+        // update visible UI
+        const nameEl = qs('.worker-name', activeCard);
+        const emailEl = qs('.worker-email', activeCard);
+        const farmNameEl = qs('.worker-company-name', activeCard);
+        const farmWrapEl = qs('.worker-company', activeCard);
+        const rolePill = qs('.worker-role-pill', activeCard);
+        const fieldsWrap = qs('.worker-fields', activeCard);
+
+        if (nameEl) nameEl.textContent = updatedName;
+        if (emailEl) emailEl.textContent = updatedEmail;
+        if (farmNameEl) farmNameEl.textContent = isOwner ? (updatedFarmName || '—') : '—';
+        if (farmWrapEl) farmWrapEl.classList.toggle('is-empty', !(isOwner && updatedFarmName));
+        if (farmWrapEl) farmWrapEl.style.display = isOwner ? '' : 'none';
+        if (rolePill) rolePill.textContent = isOwner ? 'OWNER' : 'WORKER';
+        if (fieldsWrap) {
+          fieldsWrap.innerHTML = detailSelectedFields.map(f => `<span class="worker-field-chip">${escapeHtml(typeof f === 'string' ? f : (f?.name || ''))}</span>`).join('');
+        }
+
+        // move section if owner flag changed
+        const currentSection = activeCard.closest('.user-section')?.dataset?.section;
+        const targetSection = isOwner ? 'owner' : 'worker';
+        if (currentSection && currentSection !== targetSection) {
+          const section = qs(`[data-section="${targetSection}"]`, userList);
+          const heading = section ? qs('h2', section) : null;
+          if (section && heading && heading.nextElementSibling) {
+            section.insertBefore(activeCard, heading.nextElementSibling);
+          } else if (section) {
+            section.appendChild(activeCard);
+          }
+        }
+
+        // refresh selects (owner list may have changed)
+        syncNewUserSelects();
+        syncDetailSelects();
+
+        originalSnapshot = {
+          userId: activeCard.dataset.userId || '',
+          farmName: updatedFarmName,
+          name: updatedName,
+          lastName: updatedLastName,
+          firstName: updatedFirstName,
+          email: updatedEmail,
+          owner: isOwner ? 'はい' : 'いいえ',
+          ownerId: isOwner ? '' : ownerId,
+          fields: detailSelectedFields.slice(),
+          postalCode: updatedPostalCode,
+          address: updatedAddress,
+          gender: updatedGender,
+          birthday: updatedBirthday,
+          note: updatedNote,
+          lastLogin: activeCard.dataset.lastLogin || '-',
+          createdAt: activeCard.dataset.createdAt || '-'
+        };
+
+        // refresh search/pagination
+        applyUserSearch();
+        setDetailEditMode(false);
+        if (detailUserPassword) detailUserPassword.value = '';
+        alert('保存しました。');
+      } catch (err) {
+        console.error('Failed to update user:', err);
+        alert(`保存に失敗しました。
+${err.message || err}`);
+      } finally {
+        btnSave.disabled = oldDisabled;
+      }
     });
   }
 
