@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnPrevMonth = document.querySelector('#prev-month');
   const btnNextMonth = document.querySelector('#next-month');
   const monthLabel = document.querySelector('#current-month-label');
+  const btnJumpCurrentMonth = document.querySelector('#jump-current-month');
   const filterAllBtn = document.querySelector('#filter-all');
   const ymPicker = document.querySelector('#year-month-picker');
   const yearSelect = document.querySelector('#year-select');
@@ -355,6 +356,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       const d = new Date(state.viewYear, state.viewMonth + 1, 1);
       state.viewYear = d.getFullYear();
       state.viewMonth = d.getMonth();
+      state.selectedDate = null;
+      await reloadReportsForView();
+      rerender({ resetPage: false });
+    });
+  }
+  if (btnJumpCurrentMonth) {
+    btnJumpCurrentMonth.addEventListener('click', async () => {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+      if (state.viewYear === currentYear && state.viewMonth === currentMonth) return;
+      state.viewYear = currentYear;
+      state.viewMonth = currentMonth;
       state.selectedDate = null;
       await reloadReportsForView();
       rerender({ resetPage: false });
@@ -1917,6 +1931,13 @@ function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter
   if (monthLabel) monthLabel.textContent = `${state.viewYear}年 ${state.viewMonth + 1}月`;
   if (yearSelect) yearSelect.value = String(state.viewYear);
   if (monthSelect) monthSelect.value = String(state.viewMonth);
+
+  const btnJumpCurrentMonth = document.querySelector('#jump-current-month');
+  if (btnJumpCurrentMonth) {
+    const today = new Date();
+    const isCurrentMonth = state.viewYear === today.getFullYear() && state.viewMonth === today.getMonth();
+    btnJumpCurrentMonth.disabled = isCurrentMonth;
+  }
 
   if (filterAllBtn) {
     if (state.selectedDate) filterAllBtn.classList.remove('active');
