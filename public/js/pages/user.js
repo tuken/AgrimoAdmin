@@ -301,9 +301,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const ownerDisplayName = `${String(user?.parent?.lastName || '').trim()} ${String(user?.parent?.firstName || '').trim()}`.trim()
         || String(user?.parent?.email || '').trim();
+      const ownerDisplayFarmName = String(user?.parent?.farmName || '').trim();
+      const ownerDisplay = ownerDisplayFarmName || ownerDisplayName;
       const displayFarmName = isOwner
         ? String(user?.farmName || '').trim()
-        : String(user?.parent?.farmName || '').trim() || String(user?.farmName || '').trim() || ownerDisplayName;
+        : ownerDisplayFarmName || String(user?.farmName || '').trim() || ownerDisplayName;
 
       buildWorkerCard({
         id: String(user?.id || '').trim(),
@@ -314,6 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         email: String(user?.email || '').trim(),
         isOwner,
         ownerId: String(user?.parent?.id || '').trim(),
+        ownerName: ownerDisplay,
         fields,
         postalCode: String(user?.postalCode || '').trim(),
         address: String(user?.address || '').trim(),
@@ -833,7 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 
-  function buildWorkerCard({ id, farmName = '', name, lastName = '', firstName = '', email, isOwner, ownerId = '', fields, postalCode = '', address = '', gender = '', birthday = '', note = '', lastLogin, createdAt }) {
+  function buildWorkerCard({ id, farmName = '', name, lastName = '', firstName = '', email, isOwner, ownerId = '', ownerName = '', fields, postalCode = '', address = '', gender = '', birthday = '', note = '', lastLogin, createdAt }) {
     const roleLabel = isOwner ? 'OWNER' : 'WORKER';
     const sectionSelector = isOwner ? '[data-section="owner"]' : '[data-section="worker"]';
     const section = qs(sectionSelector, userList);
@@ -853,6 +856,7 @@ document.addEventListener('DOMContentLoaded', () => {
     article.dataset.email = email;
     article.dataset.owner = isOwner ? 'はい' : 'いいえ';
     article.dataset.ownerId = ownerId || '';
+    article.dataset.ownerName = ownerName || '';
     article.dataset.fields = fieldNames.join(',');
     article.dataset.fieldIds = fieldIds.join(',');
     article.dataset.postalCode = postalCode || '';
@@ -1101,6 +1105,7 @@ ${err.message || err}`);
       email: data.email || '',
       owner: data.owner || 'いいえ',
       ownerId: data.ownerId || '',
+      ownerName: data.ownerName || '',
       fields: (() => {
         const names = String(data.fields || '').split(',').map(s => s.trim()).filter(Boolean);
         const ids = String(data.fieldIds || '').split(',').map(s => s.trim());
@@ -1138,9 +1143,10 @@ ${err.message || err}`);
       detailOwnerSelect.value = ownerId;
       if (!detailOwnerSelect.value && ownerId) {
         const ownerOpt = getOwnerOptionById(ownerId);
-        if (ownerOpt) {
-          detailOwnerSelect.innerHTML = `<option value="${escapeHtml(ownerOpt.id)}">${escapeHtml(ownerOpt.name)}</option>`;
-          detailOwnerSelect.value = ownerOpt.id;
+        const ownerLabel = ownerOpt?.name || originalSnapshot.ownerName || '';
+        if (ownerLabel) {
+          detailOwnerSelect.innerHTML = `<option value="${escapeHtml(ownerId)}">${escapeHtml(ownerLabel)}</option>`;
+          detailOwnerSelect.value = ownerId;
         }
       }
     }
@@ -1282,6 +1288,12 @@ ${err.message || err}`);
         activeCard.dataset.email = updatedEmail;
         activeCard.dataset.owner = isOwner ? 'はい' : 'いいえ';
         activeCard.dataset.ownerId = isOwner ? '' : ownerId;
+        if (isOwner) {
+          activeCard.dataset.ownerName = '';
+        } else {
+          const selectedOwner = getOwnerOptionById(ownerId);
+          activeCard.dataset.ownerName = selectedOwner?.name || activeCard.dataset.ownerName || originalSnapshot?.ownerName || '';
+        }
         activeCard.dataset.fields = detailSelectedFields.map((f) => typeof f === 'string' ? f : (f?.name || '')).filter(Boolean).join(',');
         activeCard.dataset.fieldIds = detailSelectedFields.map((f) => typeof f === 'string' ? '' : (f?.id || '')).join(',');
         activeCard.dataset.postalCode = updatedPostalCode;
@@ -1334,6 +1346,7 @@ ${err.message || err}`);
           email: updatedEmail,
           owner: isOwner ? 'はい' : 'いいえ',
           ownerId: isOwner ? '' : ownerId,
+          ownerName: activeCard.dataset.ownerName || originalSnapshot?.ownerName || '',
           fields: detailSelectedFields.slice(),
           postalCode: updatedPostalCode,
           address: updatedAddress,
