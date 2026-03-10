@@ -1032,9 +1032,30 @@
     overflow-y: visible;   /* もしくは overflow: unset; でもOK */
   }
 
+  .panel-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .panel-header-main {
+    width: 100%;
+  }
+
   .panel-title {
+    display: flex;
+    align-items: center;
     gap: 8px;
     font-size: 0.98rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-wrap: nowrap;
+  }
+
+  .calendar-sub {
+    margin-top: 6px;
+    line-height: 1.55;
   }
 
   .panel-title-icon {
@@ -1046,6 +1067,23 @@
   .panel-title-icon svg {
     width: 15px;
     height: 15px;
+  }
+
+  .calendar-nav {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+    align-self: stretch;
+  }
+
+  .calendar-month-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .calendar-today-jump {
+    flex: 0 0 auto;
   }
 
   /* ついでに少し詰めておくと収まりが良くなる */
@@ -1064,7 +1102,6 @@
 /*    min-width: 420px;  /* ← 全7列が絶対に収まる幅を指定 */*/
     font-size: 0.65rem;
   }
-
 
   /* 日付下のタグ（施肥／灌水など）は一覧で見れば十分なので隠す */
   .calendar-day-content {
