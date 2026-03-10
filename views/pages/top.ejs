@@ -111,7 +111,14 @@
             <div class="recent-report-list">
               <% if (latestReports && latestReports.length) { %>
                 <% latestReports.forEach((report) => { %>
-                  <article class="recent-report-card">
+                  <a
+                    class="recent-report-card recent-report-card--link"
+                    href="/report_list?openReportId=<%= encodeURIComponent(report.id) %>&openReportDate=<%= encodeURIComponent(report.workDate || '') %>"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="<%= report.title %> の詳細を別タブで開く"
+                    title="クリックで日報詳細を別タブで開く"
+                  >
                     <div class="recent-report-main">
                       <div class="recent-report-meta-row">
                         <span class="recent-report-date"><%= report.datetimeLabel %></span>
@@ -122,8 +129,9 @@
                       <div class="recent-report-worker">
                         担当：<%= report.workerName %> ／ 作業時間 <%= report.workHours != null ? report.workHours : 0 %>h
                       </div>
+                      <div class="recent-report-hint">クリックで詳細を開く</div>
                     </div>
-                  </article>
+                  </a>
                 <% }) %>
               <% } else { %>
                 <article class="recent-report-card">

@@ -32,7 +32,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnPrevMonth = document.querySelector('#prev-month');
   const btnNextMonth = document.querySelector('#next-month');
   const monthLabel = document.querySelector('#current-month-label');
-  const btnJumpCurrentMonth = document.querySelector('#jump-current-month');
   const filterAllBtn = document.querySelector('#filter-all');
   const ymPicker = document.querySelector('#year-month-picker');
   const yearSelect = document.querySelector('#year-select');
@@ -272,6 +271,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     pageSize: 8,
   };
 
+  const urlParams = new URLSearchParams(window.location.search || '');
+  const requestedOpenReportId = String(urlParams.get('openReportId') || '').trim();
+  const requestedOpenReportDate = String(urlParams.get('openReportDate') || '').trim();
+  let hasAutoOpenedRequestedReport = false;
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(requestedOpenReportDate)) {
+    state.viewYear = Number(requestedOpenReportDate.slice(0, 4));
+    state.viewMonth = Number(requestedOpenReportDate.slice(5, 7)) - 1;
+    state.selectedDate = requestedOpenReportDate.slice(0, 10);
+  }
+
   // 年月ピッカー初期化（カードから範囲推定）
   const years = extractYears(cards, state.viewYear);
   if (yearSelect) {
@@ -300,6 +310,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       pageInfo,
     });
     syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
+  }
+
+  function tryAutoOpenRequestedReport() {
+    if (hasAutoOpenedRequestedReport || !requestedOpenReportId || !detailModal) return;
+    const card = cards.find((node) => {
+      if (!node || !node.dataset) return false;
+      const id = String(node.dataset.reportId || node.dataset.id || '').trim();
+      return id === requestedOpenReportId;
+    });
+    if (!card) return;
+    selectedCard = card;
+    const data = readCardData(card);
+    fillDetailModal(data);
+    openModal(detailModal);
+    hasAutoOpenedRequestedReport = true;
   }
 
   // --------------------
@@ -349,6 +374,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       state.selectedDate = null;
       await reloadReportsForView();
       rerender({ resetPage: false });
+      tryAutoOpenRequestedReport();
     });
   }
   if (btnNextMonth) {
@@ -359,19 +385,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       state.selectedDate = null;
       await reloadReportsForView();
       rerender({ resetPage: false });
-    });
-  }
-  if (btnJumpCurrentMonth) {
-    btnJumpCurrentMonth.addEventListener('click', async () => {
-      const today = new Date();
-      const currentYear = today.getFullYear();
-      const currentMonth = today.getMonth();
-      if (state.viewYear === currentYear && state.viewMonth === currentMonth) return;
-      state.viewYear = currentYear;
-      state.viewMonth = currentMonth;
-      state.selectedDate = null;
-      await reloadReportsForView();
-      rerender({ resetPage: false });
+      tryAutoOpenRequestedReport();
     });
   }
 
@@ -610,6 +624,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 初期描画
   rerender({ resetPage: false });
+  tryAutoOpenRequestedReport();
 });
 
 // --------------------
@@ -1931,13 +1946,6 @@ function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter
   if (monthLabel) monthLabel.textContent = `${state.viewYear}年 ${state.viewMonth + 1}月`;
   if (yearSelect) yearSelect.value = String(state.viewYear);
   if (monthSelect) monthSelect.value = String(state.viewMonth);
-
-  const btnJumpCurrentMonth = document.querySelector('#jump-current-month');
-  if (btnJumpCurrentMonth) {
-    const today = new Date();
-    const isCurrentMonth = state.viewYear === today.getFullYear() && state.viewMonth === today.getMonth();
-    btnJumpCurrentMonth.disabled = isCurrentMonth;
-  }
 
   if (filterAllBtn) {
     if (state.selectedDate) filterAllBtn.classList.remove('active');

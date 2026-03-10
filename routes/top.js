@@ -6,69 +6,19 @@ const { findAuthContextByUserId } = require('../models/user');
 
 const router = express.Router();
 
-async function fetchFreshFieldsForTop(req, sessionUser) {
-  const endpoint = process.env.GRAPHQL_ENDPOINT;
-  if (!endpoint || !sessionUser?.id) return null;
-
-  const headers = {};
-  if (req.session?.token) headers.authorization = `Bearer ${req.session.token}`;
-  if (process.env.GRAPHQL_API_KEY) headers['x-api-key'] = process.env.GRAPHQL_API_KEY;
-
-  const roleType = Number(sessionUser.role_id ?? sessionUser.role_type ?? sessionUser.roleType ?? sessionUser.roleId);
-  const ownerID = roleType === 1 ? null : String(sessionUser.id);
-  const query = `
-    query FindFieldsForTop($ownerID: ID) {
-      findFields(ownerID: $ownerID) {
-        id
-        name
-        latitude
-        longitude
-      }
-    }
-  `;
-
-  try {
-    const result = await callUpstreamGraphQL({
-      endpoint,
-      query,
-      variables: ownerID ? { ownerID } : {},
-      headers,
-    });
-    if (result?.json?.errors?.length) {
-      console.warn('[top] fresh field fetch returned errors:', result.json.errors);
-      return null;
-    }
-    const list = Array.isArray(result?.json?.data?.findFields) ? result.json.data.findFields : [];
-    return list
-      .map((field) => ({
-        id: field?.id,
-        name: field?.name,
-        latitude: field?.latitude,
-        longitude: field?.longitude,
-      }))
-      .filter((field) => field.id != null && String(field.name || '').trim());
-  } catch (err) {
-    console.error('[top] fresh field fetch failed:', err);
-    return null;
-  }
-}
-
 async function refreshSessionUserFields(req) {
   const sessionUser = req.session?.user || null;
   if (!sessionUser?.id) return sessionUser;
   try {
     const ctx = await findAuthContextByUserId(sessionUser.id);
-    const freshGraphqlFields = await fetchFreshFieldsForTop(req, sessionUser);
-    const nextUser = {
+    if (!ctx?.user) return sessionUser;
+    req.session.user = {
       ...req.session.user,
-      ...(ctx?.user || {}),
-      org: ctx?.org || req.session.user?.org || null,
-      fields: Array.isArray(freshGraphqlFields)
-        ? freshGraphqlFields
-        : (Array.isArray(ctx?.fields) ? ctx.fields : (Array.isArray(req.session.user?.fields) ? req.session.user.fields : [])),
+      ...ctx.user,
+      org: ctx.org || null,
+      fields: Array.isArray(ctx.fields) ? ctx.fields : [],
     };
-    req.session.user = nextUser;
-    const freshFields = Array.isArray(nextUser.fields) ? nextUser.fields : [];
+    const freshFields = Array.isArray(req.session.user.fields) ? req.session.user.fields : [];
     const selectedFieldId = req.session.selectedFieldId ? Number(req.session.selectedFieldId) : NaN;
     if (freshFields.length === 0) {
       delete req.session.selectedFieldId;
@@ -81,7 +31,6 @@ async function refreshSessionUserFields(req) {
     return sessionUser;
   }
 }
-
 
 
 function formatDateTimeLabel(value) {
@@ -146,12 +95,13 @@ async function fetchLatestWorkReports(req) {
       const workDate = String(item?.workDate || '');
       return {
         id: item?.id || '',
+        workDate,
         datetimeLabel: formatDateTimeLabel(workDate),
         fieldName: String(item?.field?.name || '—'),
         title: title || '日報',
         workerName,
         workHours: item?.workHours != null ? Number(item.workHours) : null,
-        isToday: workDate === todayYmd,
+        isToday: workDate.slice(0, 10) === todayYmd,
       };
     });
   } catch (err) {
@@ -226,7 +176,6 @@ router.get('/', async (req, res) => {
   if (process.env.GRAPHQL_API_KEY) headers['x-api-key'] = process.env.GRAPHQL_API_KEY;
 
   let weather = { ok: false, locationLabel, periodLabel: '', days: [], error: '' };
-  const latestReports = await fetchLatestWorkReports(req);
 
   if (!endpoint) {
     weather.error = 'GRAPHQL_ENDPOINT が未設定です';
@@ -252,6 +201,8 @@ router.get('/', async (req, res) => {
       weather.error = '天気情報の取得中にエラーが発生しました';
     }
   }
+
+  const latestReports = await fetchLatestWorkReports(req);
 
   return res.render('pages/top', {
     title: 'トップ',
