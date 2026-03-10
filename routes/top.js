@@ -82,6 +82,84 @@ async function refreshSessionUserFields(req) {
   }
 }
 
+
+
+function formatDateTimeLabel(value) {
+  if (!value) return '-';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return String(value);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  const hh = String(dt.getHours()).padStart(2, '0');
+  const mm = String(dt.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${d} ${hh}:${mm}`;
+}
+
+async function fetchLatestWorkReports(req) {
+  const endpoint = process.env.GRAPHQL_ENDPOINT;
+  if (!endpoint) return [];
+
+  const headers = {};
+  if (req.session?.token) headers.authorization = `Bearer ${req.session.token}`;
+  if (process.env.GRAPHQL_API_KEY) headers['x-api-key'] = process.env.GRAPHQL_API_KEY;
+
+  const query = `
+    query LatestWorkReports($count: Int!) {
+      latestWorkReports(count: $count) {
+        id
+        workDate
+        workHours
+        workDetail
+        field {
+          id
+          name
+        }
+        user {
+          firstName
+          lastName
+        }
+      }
+    }
+  `;
+
+  try {
+    const result = await callUpstreamGraphQL({
+      endpoint,
+      query,
+      variables: { count: 3 },
+      headers,
+    });
+    if (result?.json?.errors?.length) {
+      console.error('[top] latestWorkReports errors:', result.json.errors);
+      return [];
+    }
+    const list = Array.isArray(result?.json?.data?.latestWorkReports) ? result.json.data.latestWorkReports : [];
+    const today = new Date();
+    const todayYmd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return list.map((item) => {
+      const workDetail = String(item?.workDetail || '').trim();
+      const title = (workDetail.split(/\r?\n/)[0] || '日報').trim();
+      const firstName = String(item?.user?.firstName || '').trim();
+      const lastName = String(item?.user?.lastName || '').trim();
+      const workerName = [lastName, firstName].filter(Boolean).join(' ') || '—';
+      const workDate = String(item?.workDate || '');
+      return {
+        id: item?.id || '',
+        datetimeLabel: formatDateTimeLabel(workDate),
+        fieldName: String(item?.field?.name || '—'),
+        title: title || '日報',
+        workerName,
+        workHours: item?.workHours != null ? Number(item.workHours) : null,
+        isToday: workDate === todayYmd,
+      };
+    });
+  } catch (err) {
+    console.error('[top] latestWorkReports fetch failed:', err);
+    return [];
+  }
+}
+
 // TOP is protected
 router.use(requireAuth);
 
@@ -148,6 +226,7 @@ router.get('/', async (req, res) => {
   if (process.env.GRAPHQL_API_KEY) headers['x-api-key'] = process.env.GRAPHQL_API_KEY;
 
   let weather = { ok: false, locationLabel, periodLabel: '', days: [], error: '' };
+  const latestReports = await fetchLatestWorkReports(req);
 
   if (!endpoint) {
     weather.error = 'GRAPHQL_ENDPOINT が未設定です';
@@ -181,6 +260,7 @@ router.get('/', async (req, res) => {
     fields,
     selectedFieldId: Number.isNaN(selectedFieldId) ? null : selectedFieldId,
     weather,
+    latestReports,
   });
 });
 

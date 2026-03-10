@@ -109,53 +109,30 @@
             </div>
 
             <div class="recent-report-list">
-              <article class="recent-report-card">
-                <div class="recent-report-main">
-                  <div class="recent-report-meta-row">
-                    <span class="recent-report-date">2025-12-04 16:40</span>
-                    <span class="recent-report-field">3号圃場</span>
-                    <span class="recent-report-tag">本日分</span>
+              <% if (latestReports && latestReports.length) { %>
+                <% latestReports.forEach((report) => { %>
+                  <article class="recent-report-card">
+                    <div class="recent-report-main">
+                      <div class="recent-report-meta-row">
+                        <span class="recent-report-date"><%= report.datetimeLabel %></span>
+                        <span class="recent-report-field"><%= report.fieldName %></span>
+                        <% if (report.isToday) { %><span class="recent-report-tag">本日分</span><% } %>
+                      </div>
+                      <div class="recent-report-title"><%= report.title %></div>
+                      <div class="recent-report-worker">
+                        担当：<%= report.workerName %> ／ 作業時間 <%= report.workHours != null ? report.workHours : 0 %>h
+                      </div>
+                    </div>
+                  </article>
+                <% }) %>
+              <% } else { %>
+                <article class="recent-report-card">
+                  <div class="recent-report-main">
+                    <div class="recent-report-title">最近登録された日報はありません</div>
+                    <div class="recent-report-worker">直近の入力状況がここに表示されます</div>
                   </div>
-                  <div class="recent-report-title">
-                    朝の潅水・生育状況の目視確認
-                  </div>
-                  <div class="recent-report-worker">
-                    担当：山田 太郎 ／ 作業時間 1.5h
-                  </div>
-                </div>
-              </article>
-
-              <article class="recent-report-card">
-                <div class="recent-report-main">
-                  <div class="recent-report-meta-row">
-                    <span class="recent-report-date">2025-12-04 15:10</span>
-                    <span class="recent-report-field">2号圃場</span>
-                    <span class="recent-report-tag">本日分</span>
-                  </div>
-                  <div class="recent-report-title">
-                    草刈り（通路・畝間）と畝の状態チェック
-                  </div>
-                  <div class="recent-report-worker">
-                    担当：佐藤 花子 ／ 作業時間 2.0h
-                  </div>
-                </div>
-              </article>
-
-              <article class="recent-report-card">
-                <div class="recent-report-main">
-                  <div class="recent-report-meta-row">
-                    <span class="recent-report-date">2025-12-04 13:25</span>
-                    <span class="recent-report-field">1号圃場</span>
-                    <span class="recent-report-tag">本日分</span>
-                  </div>
-                  <div class="recent-report-title">
-                    追肥（有機肥料）および土壌水分の計測
-                  </div>
-                  <div class="recent-report-worker">
-                    担当：田中 一郎 ／ 作業時間 1.0h
-                  </div>
-                </div>
-              </article>
+                </article>
+              <% } %>
             </div>
           </div>
 
