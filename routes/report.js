@@ -1,10 +1,28 @@
 const express = require('express');
 const requireAuth = require('../middleware/requireAuth');
 const { callUpstreamGraphQL } = require('../services/gql');
+const { findAuthContextByUserId } = require('../models/user');
 const { getWeatherCodes } = require('../services/weather');
 
 const router = express.Router();
 router.use(requireAuth);
+
+async function refreshSessionUserFields(req) {
+  const sessionUser = req.session?.user || null;
+  if (!sessionUser?.id) return;
+  try {
+    const ctx = await findAuthContextByUserId(sessionUser.id);
+    if (!ctx?.user) return;
+    req.session.user = {
+      ...req.session.user,
+      ...ctx.user,
+      org: ctx.org || null,
+      fields: Array.isArray(ctx.fields) ? ctx.fields : [],
+    };
+  } catch (err) {
+    console.error('[report_list] session field refresh failed:', err);
+  }
+}
 
 const WORK_TYPES_QUERY = `
 query wt {
@@ -58,6 +76,7 @@ router.get('/api/crop-varieties', async (req, res) => {
 });
 
 router.get('/report_list', async (req, res) => {
+  await refreshSessionUserFields(req);
   const endpoint = process.env.GRAPHQL_ENDPOINT;
 
   // Weather codes (code -> japanese)

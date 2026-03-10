@@ -39,11 +39,9 @@ async function findByEmail(email) {
  * - orgs (0/1) via users.org_id
  * - fields (0..N) via fields.user_id
  */
-async function findAuthContextByEmail(email) {
-  const user = await findByEmail(email);
+async function buildAuthContextForUser(user) {
   if (!user) return null;
 
-  // org (optional)
   let org = null;
   if (user.org_id) {
     const orgRows = await query(
@@ -53,10 +51,8 @@ async function findAuthContextByEmail(email) {
     org = orgRows[0] || null;
   }
 
-  // fields (0..N)
   let fieldRows = [];
   if (Number(user.role_id) === 1 && user.org_id) {
-    // role_id=1: show all fields in the same org
     fieldRows = await query(
       `SELECT f.id, f.name, f.latitude, f.longitude
        FROM fields f
@@ -66,7 +62,6 @@ async function findAuthContextByEmail(email) {
       [user.org_id]
     );
   } else {
-    // role_id>=2: fields owned by the user
     fieldRows = await query(
       'SELECT id, name, latitude, longitude FROM fields WHERE user_id = ? AND deleted_at IS NULL ORDER BY id ASC',
       [user.id]
@@ -78,6 +73,18 @@ async function findAuthContextByEmail(email) {
     org,
     fields: Array.isArray(fieldRows) ? fieldRows : [],
   };
+}
+
+async function findAuthContextByEmail(email) {
+  const user = await findByEmail(email);
+  if (!user) return null;
+  return buildAuthContextForUser(user);
+}
+
+async function findAuthContextByUserId(userId) {
+  const user = await findById(userId);
+  if (!user) return null;
+  return buildAuthContextForUser(user);
 }
 
 
@@ -154,6 +161,7 @@ module.exports = {
   findOrgById,
   findByEmail,
   findAuthContextByEmail,
+  findAuthContextByUserId,
   verifyPassword,
   updateLastLoginAt,
   hashPassword,

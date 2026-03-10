@@ -1,14 +1,93 @@
 const express = require('express');
 const requireAuth = require('../middleware/requireAuth');
 const { getWeeklyForecast } = require('../services/weather');
+const { callUpstreamGraphQL } = require('../services/gql');
+const { findAuthContextByUserId } = require('../models/user');
 
 const router = express.Router();
+
+async function fetchFreshFieldsForTop(req, sessionUser) {
+  const endpoint = process.env.GRAPHQL_ENDPOINT;
+  if (!endpoint || !sessionUser?.id) return null;
+
+  const headers = {};
+  if (req.session?.token) headers.authorization = `Bearer ${req.session.token}`;
+  if (process.env.GRAPHQL_API_KEY) headers['x-api-key'] = process.env.GRAPHQL_API_KEY;
+
+  const roleType = Number(sessionUser.role_id ?? sessionUser.role_type ?? sessionUser.roleType ?? sessionUser.roleId);
+  const ownerID = roleType === 1 ? null : String(sessionUser.id);
+  const query = `
+    query FindFieldsForTop($ownerID: ID) {
+      findFields(ownerID: $ownerID) {
+        id
+        name
+        latitude
+        longitude
+      }
+    }
+  `;
+
+  try {
+    const result = await callUpstreamGraphQL({
+      endpoint,
+      query,
+      variables: ownerID ? { ownerID } : {},
+      headers,
+    });
+    if (result?.json?.errors?.length) {
+      console.warn('[top] fresh field fetch returned errors:', result.json.errors);
+      return null;
+    }
+    const list = Array.isArray(result?.json?.data?.findFields) ? result.json.data.findFields : [];
+    return list
+      .map((field) => ({
+        id: field?.id,
+        name: field?.name,
+        latitude: field?.latitude,
+        longitude: field?.longitude,
+      }))
+      .filter((field) => field.id != null && String(field.name || '').trim());
+  } catch (err) {
+    console.error('[top] fresh field fetch failed:', err);
+    return null;
+  }
+}
+
+async function refreshSessionUserFields(req) {
+  const sessionUser = req.session?.user || null;
+  if (!sessionUser?.id) return sessionUser;
+  try {
+    const ctx = await findAuthContextByUserId(sessionUser.id);
+    const freshGraphqlFields = await fetchFreshFieldsForTop(req, sessionUser);
+    const nextUser = {
+      ...req.session.user,
+      ...(ctx?.user || {}),
+      org: ctx?.org || req.session.user?.org || null,
+      fields: Array.isArray(freshGraphqlFields)
+        ? freshGraphqlFields
+        : (Array.isArray(ctx?.fields) ? ctx.fields : (Array.isArray(req.session.user?.fields) ? req.session.user.fields : [])),
+    };
+    req.session.user = nextUser;
+    const freshFields = Array.isArray(nextUser.fields) ? nextUser.fields : [];
+    const selectedFieldId = req.session.selectedFieldId ? Number(req.session.selectedFieldId) : NaN;
+    if (freshFields.length === 0) {
+      delete req.session.selectedFieldId;
+    } else if (!Number.isNaN(selectedFieldId) && !freshFields.some((f) => Number(f.id) === selectedFieldId)) {
+      req.session.selectedFieldId = Number(freshFields[0].id);
+    }
+    return req.session.user;
+  } catch (err) {
+    console.error('[top] session field refresh failed:', err);
+    return sessionUser;
+  }
+}
 
 // TOP is protected
 router.use(requireAuth);
 
 // 圃場切替はクエリ文字列を使わず、POST + session に保存する
-router.post('/select-field', (req, res) => {
+router.post('/select-field', async (req, res) => {
+  await refreshSessionUserFields(req);
   const user = req.session.user || null;
   const roleType = user ? Number(user.role_id ?? user.role_type ?? user.roleType ?? user.roleId) : NaN;
   const fields = Array.isArray(user?.fields) ? user.fields : [];
@@ -34,6 +113,7 @@ router.post('/select-field', (req, res) => {
 });
 
 router.get('/', async (req, res) => {
+  await refreshSessionUserFields(req);
   const user = req.session.user || null;
   const endpoint = process.env.GRAPHQL_ENDPOINT;
 

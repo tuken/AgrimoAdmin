@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const ownerFilter = document.querySelector('#owner-filter');
   const fieldFilter = document.querySelector('#field-filter');
   const isRole1 = !!ownerFilter;
+  const currentUserId = String(pageRoot?.dataset?.userId || '').trim();
   const taskFilter = document.querySelector('#task-filter');
 
   const btnPrevMonth = document.querySelector('#prev-month');
@@ -48,6 +49,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {
       console.error('[report] role1 filters init failed:', e);
     }
+  } else {
+    await refreshCurrentUserFieldOptions({ updateFilter: true });
+  }
+
+  async function refreshCurrentUserFieldOptions(options) {
+    const opts = options || {};
+    if (isRole1 || !currentUserId) return [];
+    try {
+      const fields = await fetchFieldsForOwner(currentUserId);
+      if (opts.updateFilter) populateFieldFilterOptions(fieldFilter, fields);
+      refreshFieldSelectOptions(document.querySelector('#new-field'), fields, {
+        preserveValue: true,
+        singleSelectAutoPick: true,
+      });
+      refreshFieldSelectOptions(document.querySelector('#edit-field'), fields, {
+        preserveValue: true,
+      });
+      refreshFieldSelectOptions(document.querySelector('#detail-field'), fields, {
+        preserveValue: true,
+      });
+      return fields;
+    } catch (err) {
+      console.error('[report] refreshCurrentUserFieldOptions failed:', err);
+      return [];
+    }
+  }
+
+
+  if (!isRole1 && fieldFilter) {
+    fieldFilter.addEventListener('focus', function () {
+      refreshCurrentUserFieldOptions({ updateFilter: true });
+    });
+    fieldFilter.addEventListener('click', function () {
+      refreshCurrentUserFieldOptions({ updateFilter: true });
+    });
   }
 
   // --------------------
@@ -97,11 +133,79 @@ document.addEventListener('DOMContentLoaded', async () => {
   // NOTE: role_id により「編集」ボタン自体が描画されない場合がある
   const detailEditBtn = document.querySelector('#detail-edit');
 
+  function todayDateOnly() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  function clampDateInputValue(input) {
+    if (!input) return;
+    const min = String(input.min || '1900-01-01');
+    const max = String(input.max || todayDateOnly());
+    if (!input.value) return;
+    if (input.value < min) {
+      input.value = min;
+      return;
+    }
+    if (input.value > max) {
+      input.value = max;
+    }
+  }
+
+  function bindDatePickerGuard(input) {
+    if (!input) return;
+    input.min = input.min || '1900-01-01';
+    input.max = input.max || todayDateOnly();
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('inputmode', 'none');
+
+    const openPicker = () => {
+      if (input.disabled) return;
+      if (typeof input.showPicker === 'function') {
+        try { input.showPicker(); } catch (_) {}
+      }
+    };
+
+    input.addEventListener('focus', () => {
+      setTimeout(openPicker, 0);
+    });
+
+    input.addEventListener('click', () => {
+      openPicker();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      const key = e.key;
+      if (key === 'Tab' || key === 'Shift' || key === 'Escape') return;
+      if (key === 'Enter' || key === ' ' || key === 'ArrowDown') {
+        e.preventDefault();
+        openPicker();
+        return;
+      }
+      if (key.startsWith('Arrow') || key === 'Home' || key === 'End' || key === 'PageUp' || key === 'PageDown') return;
+      e.preventDefault();
+    });
+
+    input.addEventListener('beforeinput', (e) => {
+      if (input.disabled) return;
+      e.preventDefault();
+    });
+
+    input.addEventListener('paste', (e) => e.preventDefault());
+    input.addEventListener('drop', (e) => e.preventDefault());
+    input.addEventListener('change', () => clampDateInputValue(input));
+    input.addEventListener('blur', () => clampDateInputValue(input));
+  }
+
   let selectedCard = null;
 
   wireModal(createModal);
   wireModal(detailModal);
   wireModal(editModal);
+
+  bindDatePickerGuard(document.querySelector('#new-date'));
+  bindDatePickerGuard(document.querySelector('#edit-date'));
   wireCropVarietyDynamic(createForm);
   wireCropVarietyDynamic(editForm);
   wireImagePreview({ formEl: createForm, fileInputSelector: '#new-image-file', imageSelector: '#new-image', wrapperSelector: '#new-image-wrapper', placeholderSelector: '#new-image-placeholder' });
@@ -310,7 +414,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // モーダル：イベント
   // --------------------
   if (btnNew && createModal && createForm) {
-    btnNew.addEventListener('click', function () {
+    btnNew.addEventListener('click', async function () {
+      await refreshCurrentUserFieldOptions({ updateFilter: false });
       createForm.reset();
       setMessage(createMsg, '', '');
       const d = currentSelectedDateOrToday(state);
@@ -338,9 +443,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // カードクリックで詳細
   if (grid && detailModal) {
-    grid.addEventListener('click', function (e) {
+    grid.addEventListener('click', async function (e) {
       const card = e.target && e.target.closest ? e.target.closest('[data-report]') : null;
       if (!card) return;
+      await refreshCurrentUserFieldOptions({ updateFilter: false });
       selectedCard = card;
       const data = readCardData(card);
       fillDetailModal(data);
@@ -350,8 +456,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 詳細→編集
   if (detailEditBtn && editModal && editForm) {
-    detailEditBtn.addEventListener('click', function () {
+    detailEditBtn.addEventListener('click', async function () {
       if (!selectedCard) return;
+      await refreshCurrentUserFieldOptions({ updateFilter: false });
       const data = readCardData(selectedCard);
       fillEditForm(data);
       closeModal(detailModal);
@@ -1374,6 +1481,40 @@ function populateOwnerFilterOptions(selectEl, owners) {
     return `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)}</option>`;
   }).join('');
   if (list.some(function (o) { return o.id === current; })) selectEl.value = current;
+}
+
+
+function refreshFieldSelectOptions(selectEl, fields, options) {
+  if (!selectEl) return;
+  const opts = options || {};
+  const list = Array.isArray(fields) ? fields : [];
+  const previousValue = String(selectEl.value || '');
+  const placeholderText = selectEl.dataset.placeholder || String(selectEl.options?.[0]?.textContent || '選択してください').trim() || '選択してください';
+  const placeholderValue = selectEl.dataset.placeholderValue || String(selectEl.options?.[0]?.value || '');
+  selectEl.dataset.placeholder = placeholderText;
+  selectEl.dataset.placeholderValue = placeholderValue;
+  selectEl.innerHTML = '';
+
+  const placeholder = document.createElement('option');
+  placeholder.value = placeholderValue;
+  placeholder.textContent = placeholderText;
+  if (opts.singleSelectAutoPick !== true) placeholder.selected = true;
+  selectEl.appendChild(placeholder);
+
+  list.forEach(function (f) {
+    const opt = document.createElement('option');
+    opt.value = String(f.id);
+    opt.textContent = String(f.name || '');
+    selectEl.appendChild(opt);
+  });
+
+  if (opts.preserveValue && list.some(function (f) { return String(f.id) === previousValue; })) {
+    selectEl.value = previousValue;
+  } else if (opts.singleSelectAutoPick && list.length === 1) {
+    selectEl.value = String(list[0].id);
+  } else {
+    selectEl.value = placeholderValue;
+  }
 }
 
 function populateFieldFilterOptions(selectEl, fields) {
