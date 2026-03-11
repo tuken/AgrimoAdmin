@@ -56,20 +56,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function refreshCurrentUserFieldOptions(options) {
     const opts = options || {};
-    if (isRole1 || !currentUserId) return [];
+    if (isRole1) return [];
+
     try {
-      const fields = await fetchFieldsForOwner(currentUserId);
-      if (opts.updateFilter) populateFieldFilterOptions(fieldFilter, fields);
+      const fields = collectFieldOptionsFromDom();
+
+      if (opts.updateFilter) {
+        populateFieldFilterOptions(fieldFilter, fields);
+      }
+
       refreshFieldSelectOptions(document.querySelector('#new-field'), fields, {
         preserveValue: true,
         singleSelectAutoPick: true,
       });
+
       refreshFieldSelectOptions(document.querySelector('#edit-field'), fields, {
         preserveValue: true,
       });
+
       refreshFieldSelectOptions(document.querySelector('#detail-field'), fields, {
         preserveValue: true,
       });
+
       return fields;
     } catch (err) {
       console.error('[report] refreshCurrentUserFieldOptions failed:', err);
@@ -1489,7 +1497,46 @@ function deriveOwnersFromReportCards() {
   });
 }
 
+function collectFieldOptionsFromDom() {
+  const selectors = ['#field-filter', '#new-field', '#edit-field', '#detail-field'];
+  const uniq = new Map();
+
+  selectors.forEach(function (selector) {
+    const selectEl = document.querySelector(selector);
+    if (!selectEl) return;
+
+    Array.from(selectEl.options || []).forEach(function (opt) {
+      const id = String(opt?.value || '').trim();
+      const name = String(opt?.textContent || '').trim();
+
+      if (!id || !name) return;
+      if (uniq.has(id)) return;
+
+      uniq.set(id, { id, name });
+    });
+  });
+
+  return Array.from(uniq.values()).sort(function (a, b) {
+    const aNum = Number(a.id);
+    const bNum = Number(b.id);
+
+    if (Number.isFinite(aNum) && Number.isFinite(bNum) && aNum !== bNum) {
+      return aNum - bNum;
+    }
+    return a.name.localeCompare(b.name, 'ja');
+  });
+}
+
 async function fetchFieldsForOwner(ownerId) {
+  const normalizedOwnerId = String(ownerId || '').trim();
+
+  // role1 以外は GraphQL ではなく、サーバ描画済みの選択肢をそのまま使う
+  const ownerFilter = document.querySelector('#owner-filter');
+  const isRole1 = !!ownerFilter;
+  if (!isRole1) {
+    return collectFieldOptionsFromDom();
+  }
+
   const query = `
     query FindFields($ownerID: ID) {
       findFields(ownerID: $ownerID) {
@@ -1498,10 +1545,15 @@ async function fetchFieldsForOwner(ownerId) {
       }
     }
   `;
+
   const variables = {};
-  if (String(ownerId || '').trim()) variables.ownerID = String(ownerId).trim();
+  if (normalizedOwnerId) variables.ownerID = normalizedOwnerId;
+
   const result = await window.gql(query, variables);
-  if (result?.errors?.length) throw new Error(result.errors[0]?.message || 'Failed to fetch fields');
+  if (result?.errors?.length) {
+    throw new Error(result.errors[0]?.message || 'Failed to fetch fields');
+  }
+
   const list = Array.isArray(result?.data?.findFields) ? result.data.findFields : [];
   return list
     .map(function (f) {

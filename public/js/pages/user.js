@@ -314,6 +314,9 @@ document.addEventListener('DOMContentLoaded', () => {
         email: String(user?.email || '').trim(),
         isOwner,
         ownerId: String(user?.parent?.id || '').trim(),
+        ownerName: String(user?.parent?.farmName || '').trim()
+          || `${String(user?.parent?.lastName || '').trim()} ${String(user?.parent?.firstName || '').trim()}`.trim()
+          || String(user?.parent?.email || '').trim(),
         fields,
         postalCode: String(user?.postalCode || '').trim(),
         address: String(user?.address || '').trim(),
@@ -832,8 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return result?.data?.deleteUser || null;
   }
 
-
-  function buildWorkerCard({ id, farmName = '', name, lastName = '', firstName = '', email, isOwner, ownerId = '', fields, postalCode = '', address = '', gender = '', birthday = '', note = '', lastLogin, createdAt }) {
+  function buildWorkerCard({ id, farmName = '', name, lastName = '', firstName = '', email, isOwner, ownerId = '', ownerName = '', fields, postalCode = '', address = '', gender = '', birthday = '', note = '', lastLogin, createdAt }) {
     const roleLabel = isOwner ? 'OWNER' : 'WORKER';
     const sectionSelector = isOwner ? '[data-section="owner"]' : '[data-section="worker"]';
     const section = qs(sectionSelector, userList);
@@ -853,6 +855,7 @@ document.addEventListener('DOMContentLoaded', () => {
     article.dataset.email = email;
     article.dataset.owner = isOwner ? 'はい' : 'いいえ';
     article.dataset.ownerId = ownerId || '';
+    article.dataset.ownerName = ownerName || '';
     article.dataset.fields = fieldNames.join(',');
     article.dataset.fieldIds = fieldIds.join(',');
     article.dataset.postalCode = postalCode || '';
@@ -1101,6 +1104,7 @@ ${err.message || err}`);
       email: data.email || '',
       owner: data.owner || 'いいえ',
       ownerId: data.ownerId || '',
+      ownerName: data.ownerName || '',
       fields: (() => {
         const names = String(data.fields || '').split(',').map(s => s.trim()).filter(Boolean);
         const ids = String(data.fieldIds || '').split(',').map(s => s.trim());
@@ -1135,16 +1139,22 @@ ${err.message || err}`);
     // owner select
     if (detailOwnerSelect) {
       const ownerId = originalSnapshot.ownerId || '';
+      const ownerName = originalSnapshot.ownerName || '';
+
       detailOwnerSelect.value = ownerId;
+
       if (!detailOwnerSelect.value && ownerId) {
         const ownerOpt = getOwnerOptionById(ownerId);
+
         if (ownerOpt) {
           detailOwnerSelect.innerHTML = `<option value="${escapeHtml(ownerOpt.id)}">${escapeHtml(ownerOpt.name)}</option>`;
           detailOwnerSelect.value = ownerOpt.id;
+        } else if (ownerName) {
+          detailOwnerSelect.innerHTML = `<option value="${escapeHtml(ownerId)}">${escapeHtml(ownerName)}</option>`;
+          detailOwnerSelect.value = ownerId;
         }
       }
     }
-
     await updateDetailFieldOptions();
     setDetailEditMode(false);
     openBackdrop(detailBackdrop);

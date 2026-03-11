@@ -52,7 +52,9 @@ async function buildAuthContextForUser(user) {
   }
 
   let fieldRows = [];
-  if (Number(user.role_id) === 1 && user.org_id) {
+  const roleId = Number(user.role_id);
+
+  if (roleId === 1 && user.org_id) {
     fieldRows = await query(
       `SELECT f.id, f.name, f.latitude, f.longitude
        FROM fields f
@@ -61,9 +63,29 @@ async function buildAuthContextForUser(user) {
        ORDER BY f.id ASC`,
       [user.org_id]
     );
+  } else if (roleId === 2) {
+    fieldRows = await query(
+      `SELECT id, name, latitude, longitude
+       FROM fields
+       WHERE user_id = ? AND deleted_at IS NULL
+       ORDER BY id ASC`,
+      [user.id]
+    );
+  } else if (roleId === 3 || roleId === 4) {
+    fieldRows = await query(
+      `SELECT f.id, f.name, f.latitude, f.longitude
+       FROM field_users fu
+       INNER JOIN fields f ON f.id = fu.field_id
+       WHERE fu.user_id = ? AND f.deleted_at IS NULL
+       ORDER BY f.id ASC`,
+      [user.id]
+    );
   } else {
     fieldRows = await query(
-      'SELECT id, name, latitude, longitude FROM fields WHERE user_id = ? AND deleted_at IS NULL ORDER BY id ASC',
+      `SELECT id, name, latitude, longitude
+       FROM fields
+       WHERE user_id = ? AND deleted_at IS NULL
+       ORDER BY id ASC`,
       [user.id]
     );
   }
