@@ -937,7 +937,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const input = {
         parentID: isOwner ? null : Number(ownerId),
-        roleID: isOwner ? 2 : 3,
+        roleID: isOwner ? 2 : 4,
         email,
         password,
         farmName,
