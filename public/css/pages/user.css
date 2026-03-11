@@ -879,7 +879,7 @@
     .detail-textarea[disabled],
     .detail-note textarea[disabled] {
       background: #f9fafb;
-      color: #6b7280;
+      color: #000000;
     }
 
     .detail-image-upload-label {
