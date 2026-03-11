@@ -121,8 +121,7 @@
                   >
                     <div class="recent-report-main">
                       <div class="recent-report-meta-row">
-                        <span class="recent-report-date"><%= report.datetimeLabel %></span>
-                        <span class="recent-report-field"><%= report.fieldName %></span>
+                        <span class="recent-report-date"><%= (report.datetimeLabel || '').split(' ')[0] %></span>                        <span class="recent-report-field"><%= report.fieldName %></span>
                         <% if (report.isToday) { %><span class="recent-report-tag">本日分</span><% } %>
                       </div>
                       <div class="recent-report-title"><%= report.title %></div>
