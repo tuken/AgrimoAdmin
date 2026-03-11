@@ -143,7 +143,7 @@
             </div>
           </div>
 
-          <!-- 作業別の実績集計（今日 / 今週） -->
+          <!-- 作業別の実績集計（GraphQL: workTypeSummary） -->
           <div class="report-column">
             <div class="report-column-header">
               <div class="report-column-title">
@@ -151,82 +151,38 @@
                 <span>作業別の実績集計</span>
               </div>
               <div class="report-column-sub">
-                今日と今週の作業ボリュームを比較できます
+                今日・今週累計・今月累計の件数を切り替えて確認できます
               </div>
             </div>
 
-            <div class="work-summary-header-row">
-              <div class="report-column-sub">
-                単位：件数ベース（1日報 = 1件）
-              </div>
-              <div class="work-summary-badges">
-                <span class="work-summary-badge active">今日</span>
-                <span class="work-summary-badge">今週累計</span>
-              </div>
-            </div>
-
-            <div class="work-summary-table">
-              <div class="work-summary-row is-header">
-                <div>作業内容</div>
-                <div class="work-summary-value">今日</div>
-                <div class="work-summary-value">今週</div>
-              </div>
-
-              <div class="work-summary-row data">
-                <div class="work-summary-label">
-                  <span class="work-summary-dot"></span>
-                  <span>草刈り</span>
-                </div>
-                <div class="work-summary-value">
-                  3<span class="work-summary-unit">件</span>
-                </div>
-                <div class="work-summary-value">
-                  8<span class="work-summary-unit">件</span>
+            <div
+              class="work-summary-card"
+              id="workSummaryCard"
+              data-default-period="today"
+            >
+              <div class="work-summary-header-row">
+                <div class="work-summary-badges" role="tablist" aria-label="作業別の実績集計の表示切替">
+                  <button type="button" class="work-summary-badge active" data-period="today" role="tab" aria-selected="true">今日</button>
+                  <button type="button" class="work-summary-badge" data-period="thisWeek" role="tab" aria-selected="false">今週累計</button>
+                  <button type="button" class="work-summary-badge" data-period="thisMonth" role="tab" aria-selected="false">今月累計</button>
                 </div>
               </div>
 
-              <div class="work-summary-row data">
-                <div class="work-summary-label">
-                  <span class="work-summary-dot alt1"></span>
-                  <span>潅水</span>
+              <div class="work-summary-table">
+                <div class="work-summary-row is-header">
+                  <div>作業内容</div>
+                  <div class="work-summary-value" id="workSummaryPeriodLabel">今日</div>
                 </div>
-                <div class="work-summary-value">
-                  2<span class="work-summary-unit">件</span>
-                </div>
-                <div class="work-summary-value">
-                  6<span class="work-summary-unit">件</span>
-                </div>
-              </div>
 
-              <div class="work-summary-row data">
-                <div class="work-summary-label">
-                  <span class="work-summary-dot alt2"></span>
-                  <span>施肥</span>
-                </div>
-                <div class="work-summary-value">
-                  2<span class="work-summary-unit">件</span>
-                </div>
-                <div class="work-summary-value">
-                  5<span class="work-summary-unit">件</span>
-                </div>
-              </div>
-
-              <div class="work-summary-row data">
-                <div class="work-summary-label">
-                  <span class="work-summary-dot alt1"></span>
-                  <span>収穫</span>
-                </div>
-                <div class="work-summary-value">
-                  1<span class="work-summary-unit">件</span>
-                </div>
-                <div class="work-summary-value">
-                  4<span class="work-summary-unit">件</span>
+                <div class="work-summary-body" id="workSummaryBody">
+                  <div class="work-summary-empty">集計データはありません</div>
                 </div>
               </div>
             </div>
+            <script id="workSummaryData" type="application/json"><%- JSON.stringify(workTypeSummary || []) %></script>
           </div>
 
-          <!-- 作業実績のトップ3 -->
+          <!-- 作業実績のトップ3（GraphQL: workTypeSummary） -->
           <div class="report-column">
             <div class="report-column-header">
               <div class="report-column-title">
@@ -234,45 +190,25 @@
                 <span>作業実績のトップ3</span>
               </div>
               <div class="report-column-sub">
-                今週よく行われている作業ランキング
+                今日・今週累計・今月累計の上位3件を切り替えて確認できます
               </div>
             </div>
 
-            <div class="ranking-list">
-              <div class="ranking-item">
-                <div class="ranking-rank rank-1">1位</div>
-                <div class="ranking-main">
-                  <div class="ranking-label">草刈り</div>
-                  <div class="ranking-meta-row">
-                    <span class="ranking-chip">全体の 32%</span>
-                    <span>担当者：3名</span>
-                  </div>
+            <div
+              class="ranking-card"
+              id="workRankingCard"
+              data-default-period="today"
+            >
+              <div class="ranking-header-row">
+                <div class="ranking-badges" role="tablist" aria-label="作業実績のトップ3の表示切替">
+                  <button type="button" class="ranking-badge active" data-period="today" role="tab" aria-selected="true">今日</button>
+                  <button type="button" class="ranking-badge" data-period="thisWeek" role="tab" aria-selected="false">今週累計</button>
+                  <button type="button" class="ranking-badge" data-period="thisMonth" role="tab" aria-selected="false">今月累計</button>
                 </div>
-                <div class="ranking-value">8件</div>
               </div>
 
-              <div class="ranking-item">
-                <div class="ranking-rank rank-2">2位</div>
-                <div class="ranking-main">
-                  <div class="ranking-label">潅水</div>
-                  <div class="ranking-meta-row">
-                    <span class="ranking-chip">全体の 24%</span>
-                    <span>担当者：2名</span>
-                  </div>
-                </div>
-                <div class="ranking-value">6件</div>
-              </div>
-
-              <div class="ranking-item">
-                <div class="ranking-rank rank-3">3位</div>
-                <div class="ranking-main">
-                  <div class="ranking-label">施肥</div>
-                  <div class="ranking-meta-row">
-                    <span class="ranking-chip">全体の 20%</span>
-                    <span>担当者：2名</span>
-                  </div>
-                </div>
-                <div class="ranking-value">5件</div>
+              <div class="ranking-list" id="workRankingBody">
+                <div class="ranking-empty">集計データはありません</div>
               </div>
             </div>
           </div>

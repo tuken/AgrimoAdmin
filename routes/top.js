@@ -45,6 +45,59 @@ function formatDateTimeLabel(value) {
   return `${y}-${m}-${d} ${hh}:${mm}`;
 }
 
+
+async function fetchWorkTypeSummary(req) {
+  const endpoint = process.env.GRAPHQL_ENDPOINT;
+  if (!endpoint) return [];
+
+  const headers = {};
+  if (req.session?.token) headers.authorization = `Bearer ${req.session.token}`;
+  if (process.env.GRAPHQL_API_KEY) headers['x-api-key'] = process.env.GRAPHQL_API_KEY;
+
+  const query = `
+    query WorkTypeSummary {
+      workTypeSummary {
+        workType {
+          id
+          name
+          sortOrder
+        }
+        today
+        yesterday
+        thisWeek
+        lastWeek
+        thisMonth
+      }
+    }
+  `;
+
+  try {
+    const result = await callUpstreamGraphQL({ endpoint, query, headers });
+    if (result?.json?.errors?.length) {
+      console.error('[top] workTypeSummary errors:', result.json.errors);
+      return [];
+    }
+
+    const items = Array.isArray(result?.json?.data?.workTypeSummary)
+      ? result.json.data.workTypeSummary
+      : [];
+
+    return items.map((item) => ({
+      id: Number(item?.workType?.id ?? 0),
+      name: String(item?.workType?.name || '').trim() || '未設定',
+      sortOrder: Number(item?.workType?.sortOrder ?? 0),
+      today: Number(item?.today ?? 0),
+      thisWeek: Number(item?.thisWeek ?? 0),
+      thisMonth: Number(item?.thisMonth ?? 0),
+      yesterday: Number(item?.yesterday ?? 0),
+      lastWeek: Number(item?.lastWeek ?? 0),
+    }));
+  } catch (err) {
+    console.error('[top] workTypeSummary fetch failed:', err);
+    return [];
+  }
+}
+
 async function fetchLatestWorkReports(req) {
   const endpoint = process.env.GRAPHQL_ENDPOINT;
   if (!endpoint) return [];
@@ -202,7 +255,10 @@ router.get('/', async (req, res) => {
     }
   }
 
-  const latestReports = await fetchLatestWorkReports(req);
+  const [latestReports, workTypeSummary] = await Promise.all([
+    fetchLatestWorkReports(req),
+    fetchWorkTypeSummary(req),
+  ]);
 
   return res.render('pages/top', {
     title: 'トップ',
@@ -212,6 +268,7 @@ router.get('/', async (req, res) => {
     selectedFieldId: Number.isNaN(selectedFieldId) ? null : selectedFieldId,
     weather,
     latestReports,
+    workTypeSummary,
   });
 });
 
