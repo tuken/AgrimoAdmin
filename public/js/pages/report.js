@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const btnPrevMonth = document.querySelector('#prev-month');
   const btnNextMonth = document.querySelector('#next-month');
+  const btnCurrentMonth = document.querySelector('#current-month-button');
   const monthLabel = document.querySelector('#current-month-label');
   const filterAllBtn = document.querySelector('#filter-all');
   const ymPicker = document.querySelector('#year-month-picker');
@@ -309,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       pageNext,
       pageInfo,
     });
-    syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn });
+    syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn, btnCurrentMonth });
   }
 
   function tryAutoOpenRequestedReport() {
@@ -382,6 +383,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const d = new Date(state.viewYear, state.viewMonth + 1, 1);
       state.viewYear = d.getFullYear();
       state.viewMonth = d.getMonth();
+      state.selectedDate = null;
+      await reloadReportsForView();
+      rerender({ resetPage: false });
+      tryAutoOpenRequestedReport();
+    });
+  }
+  if (btnCurrentMonth) {
+    btnCurrentMonth.addEventListener('click', async () => {
+      const today = new Date();
+      state.viewYear = today.getFullYear();
+      state.viewMonth = today.getMonth();
       state.selectedDate = null;
       await reloadReportsForView();
       rerender({ resetPage: false });
@@ -1937,7 +1949,7 @@ function applyFiltersAndPagination({ cards, state, emptyMessage, headerTitle, he
   }
 }
 
-function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn }) {
+function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter, monthLabel, yearSelect, monthSelect, filterAllBtn, btnCurrentMonth }) {
   if (searchInput && searchInput.value !== state.search) searchInput.value = state.search;
   if (ownerFilter && ownerFilter.value !== state.owner) ownerFilter.value = state.owner;
   if (fieldFilter && fieldFilter.value !== state.field) fieldFilter.value = state.field;
@@ -1946,6 +1958,12 @@ function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter
   if (monthLabel) monthLabel.textContent = `${state.viewYear}年 ${state.viewMonth + 1}月`;
   if (yearSelect) yearSelect.value = String(state.viewYear);
   if (monthSelect) monthSelect.value = String(state.viewMonth);
+  if (btnCurrentMonth) {
+    const today = new Date();
+    const isCurrentMonth = state.viewYear === today.getFullYear() && state.viewMonth === today.getMonth();
+    btnCurrentMonth.disabled = isCurrentMonth;
+    btnCurrentMonth.setAttribute('aria-disabled', isCurrentMonth ? 'true' : 'false');
+  }
 
   if (filterAllBtn) {
     if (state.selectedDate) filterAllBtn.classList.remove('active');
