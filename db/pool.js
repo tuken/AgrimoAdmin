@@ -2,6 +2,10 @@ const mysql = require('mysql2/promise');
 
 let _pool;
 
+/**
+ * Get or create a MySQL connection pool.
+ * The pool is shared across the entire application lifecycle.
+ */
 function getPool() {
   if (_pool) return _pool;
 
@@ -20,6 +24,12 @@ function getPool() {
   return _pool;
 }
 
+/**
+ * Execute a SQL query with parameters and return the resulting rows.
+ * @param {string} sql - The SQL query to execute, with ? placeholders for parameters.
+ * @param {Array} params - An array of parameters to substitute into the query.
+ * @returns {Promise<Array>} - A promise that resolves to the array of result rows.
+ */
 async function query(sql, params = []) {
   const pool = getPool();
   const [rows] = await pool.execute(sql, params);
