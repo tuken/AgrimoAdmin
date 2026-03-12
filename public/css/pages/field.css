@@ -276,37 +276,149 @@
     }
 
     .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       font-size: 0.65rem;
+      font-weight: 700;
       border-radius: 999px;
-      padding: 2px 6px;
+      padding: 3px 8px;
       border: 1px solid rgba(255, 255, 255, 0.8);
       background: rgba(255, 255, 255, 0.18);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
+      line-height: 1;
+      white-space: nowrap;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
     }
 
-    .pill-type {
-      background: rgba(219, 234, 254, 0.9);
+    .pill::before {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      line-height: 1;
+    }
+
+    .pill-owner {
+      color: #374151;
+      background: rgba(255, 255, 255, 0.72);
+      border-color: rgba(226, 232, 240, 0.95);
+    }
+
+    .pill-owner::before {
+      content: '🏠';
+      font-size: 0.68rem;
+    }
+
+    .pill-type-rice {
+      background: rgba(227, 238, 255, 0.94);
       border-color: rgba(191, 219, 254, 1);
       color: #1d4ed8;
     }
 
-    .pill-status-active {
-      background: rgba(209, 250, 229, 0.9);
-      border-color: rgba(187, 247, 208, 1);
+    .pill-type-rice::before {
+      content: '💧';
+    }
+
+    .pill-type-field {
+      background: rgba(255, 244, 219, 0.94);
+      border-color: rgba(245, 208, 128, 0.95);
+      color: #9a6700;
+    }
+
+    .pill-type-field::before {
+      content: '🌱';
+    }
+
+    .pill-type-orchard {
+      background: rgba(236, 253, 245, 0.94);
+      border-color: rgba(167, 243, 208, 1);
       color: #047857;
     }
 
-    .pill-status-inactive {
-      background: rgba(254, 249, 195, 0.9);
-      border-color: rgba(254, 240, 138, 1);
-      color: #92400e;
+    .pill-type-orchard::before {
+      content: '🍊';
+    }
+
+    .pill-type-ranch {
+      background: rgba(243, 232, 255, 0.94);
+      border-color: rgba(221, 214, 254, 1);
+      color: #7c3aed;
+    }
+
+    .pill-type-ranch::before {
+      content: '🐄';
+    }
+
+    .pill-type-greenhouse {
+      background: rgba(220, 252, 231, 0.94);
+      border-color: rgba(187, 247, 208, 1);
+      color: #15803d;
+    }
+
+    .pill-type-greenhouse::before {
+      content: '🏡';
+    }
+
+    .pill-type-other {
+      background: rgba(241, 245, 249, 0.96);
+      border-color: rgba(203, 213, 225, 1);
+      color: #475569;
+    }
+
+    .pill-type-other::before {
+      content: '📍';
+    }
+
+    .pill-status-active {
+      background: rgba(220, 252, 231, 0.96);
+      border-color: rgba(187, 247, 208, 1);
+      color: #15803d;
+    }
+
+    .pill-status-active::before {
+      content: '●';
+      color: #22c55e;
+      font-size: 0.6rem;
+    }
+
+    .pill-status-rest {
+      background: rgba(236, 253, 245, 0.96);
+      border-color: rgba(167, 243, 208, 1);
+      color: #0f766e;
+    }
+
+    .pill-status-rest::before {
+      content: '⏸';
+      font-size: 0.62rem;
     }
 
     .pill-status-abandoned {
-      background: rgba(254, 226, 226, 0.9);
-      border-color: rgba(254, 202, 202, 1);
-      color: #b91c1c;
+      background: rgba(255, 237, 213, 0.96);
+      border-color: rgba(253, 186, 116, 0.96);
+      color: #c2410c;
+    }
+
+    .pill-status-abandoned::before {
+      content: '⚠';
+      font-size: 0.66rem;
+    }
+
+    .pill-status-neutral {
+      background: rgba(241, 245, 249, 0.96);
+      border-color: rgba(203, 213, 225, 1);
+      color: #475569;
+    }
+
+    .pill-status-neutral::before {
+      content: '•';
+      font-size: 0.8rem;
+    }
+
+    .detail-pill-preview {
+      margin-top: 8px;
+      min-height: 24px;
     }
 
     .field-meta-row {

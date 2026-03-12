@@ -35,6 +35,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const inputType = document.getElementById('detail-type');
   const inputArea = document.getElementById('detail-area');
   const inputStatus = document.getElementById('detail-status');
+  const detailTypeChip = document.getElementById('detail-type-chip');
+  const detailStatusChip = document.getElementById('detail-status-chip');
   const inputOwner = document.getElementById('detail-owner');
   const inputPostal = document.getElementById('detail-postal');
   const inputAddress = document.getElementById('detail-address');
@@ -453,6 +455,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setSelectValue(inputType, String(field.fieldTypeID || ''));
     setSelectValue(inputStatus, String(field.fieldStateID || ''));
+    updateDetailPillPreview('type', field.fieldTypeID, field.fieldTypeName);
+    updateDetailPillPreview('status', field.fieldStateID, field.fieldStateDescription);
 
     updateMap(field.latitude, field.longitude);
     setEditing(false);
@@ -481,6 +485,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     detailMapPicker?.setEditable(isEditing);
     if (modalSaveBtn) modalSaveBtn.style.display = isEditing ? '' : 'none';
     if (modalEditBtn) modalEditBtn.textContent = isEditing ? '編集終了' : '編集';
+    if (detailTypeChip?.parentElement) detailTypeChip.parentElement.style.display = isEditing ? 'none' : '';
+    if (detailStatusChip?.parentElement) detailStatusChip.parentElement.style.display = isEditing ? 'none' : '';
   }
 
   function updateDetailMapFromInputs() {
@@ -499,6 +505,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     const state = fieldStateMasters.find((x) => String(x.id) === String(id));
     return state?.description || state?.name || '';
   }
+
+  function updateDetailPillPreview(kind, id, label) {
+    const chip = kind === 'type' ? detailTypeChip : detailStatusChip;
+    if (!chip) return;
+    const rawLabel = String(label || '').trim() || (kind === 'type' ? getTypeNameById(id) : getStateDescriptionById(id)) || '—';
+    chip.textContent = rawLabel;
+    if (kind === 'type') {
+      chip.className = `pill pill-type ${getFieldTypePillClass(id, rawLabel)}`;
+    } else {
+      chip.className = `pill pill-status ${getFieldStatePillClass(id, rawLabel)}`;
+    }
+  }
+
+  inputType?.addEventListener('change', function () {
+    updateDetailPillPreview('type', inputType.value, getTypeNameById(inputType.value));
+  });
+  inputStatus?.addEventListener('change', function () {
+    updateDetailPillPreview('status', inputStatus.value, getStateDescriptionById(inputStatus.value));
+  });
 });
 
 
@@ -715,7 +740,34 @@ function esc(s) {
     .replaceAll("'", '&#39;');
 }
 
+
+function normalizeMasterLabel(value) {
+  return String(value || '').replace(/\s+/g, '').trim();
+}
+
+function getFieldTypePillClass(id, name) {
+  const key = String(id || '').trim();
+  const label = normalizeMasterLabel(name);
+  if (key === '1' || label === '水田') return 'pill-type-rice';
+  if (key === '2' || label === '畑') return 'pill-type-field';
+  if (key === '3' || label === '果樹園') return 'pill-type-orchard';
+  if (key === '4' || label === '牧場') return 'pill-type-ranch';
+  if (key === '5' || label === '温室') return 'pill-type-greenhouse';
+  return 'pill-type-other';
+}
+
+function getFieldStatePillClass(id, description) {
+  const key = String(id || '').trim().toLowerCase();
+  const label = normalizeMasterLabel(description);
+  if (key === '1' || key === 'cultivate' || label === '耕作中') return 'pill-status-active';
+  if (key === '2' || key === 'fallow' || label === '休耕中') return 'pill-status-rest';
+  if (key === '3' || key === 'abandoned' || label === '耕作放棄') return 'pill-status-abandoned';
+  return 'pill-status-neutral';
+}
+
 function toFieldCardHtml(field) {
+  const typeClass = getFieldTypePillClass(field.fieldTypeID, field.fieldTypeName);
+  const stateClass = getFieldStatePillClass(field.fieldStateID, field.fieldStateDescription);
   return `
     <article class="field-card" data-field-id="${esc(field.id)}">
       <div class="field-card-header">
@@ -727,9 +779,9 @@ function toFieldCardHtml(field) {
         </div>
       </div>
       <div class="field-pill-row">
-        ${field.fieldTypeName ? `<span class="pill pill-type">${esc(field.fieldTypeName)}</span>` : ''}
-        ${field.fieldStateDescription ? `<span class="pill pill-status-active">${esc(field.fieldStateDescription)}</span>` : ''}
-        ${field.ownerName ? `<span class="pill">${esc(field.ownerName)}</span>` : ''}
+        ${field.fieldTypeName ? `<span class="pill pill-type ${typeClass}">${esc(field.fieldTypeName)}</span>` : ''}
+        ${field.fieldStateDescription ? `<span class="pill pill-status ${stateClass}">${esc(field.fieldStateDescription)}</span>` : ''}
+        ${field.ownerName ? `<span class="pill pill-owner">${esc(field.ownerName)}</span>` : ''}
       </div>
       <div class="field-meta-row">
         <div class="field-meta-left">

@@ -1280,6 +1280,12 @@ async function fetchReports(listRoot, viewYear, viewMonth) {
             firstName
             lastName
             email
+            parent {
+              id
+              firstName
+              lastName
+              email
+            }
           }
           field {
             id
@@ -1317,6 +1323,12 @@ async function fetchReports(listRoot, viewYear, viewMonth) {
             firstName
             lastName
             email
+            parent {
+              id
+              firstName
+              lastName
+              email
+            }
           }
           field {
             id
@@ -1779,8 +1791,9 @@ async function deleteWorkReportViaGraphQL(id) {
 function mergeUpdatedReportIntoCardData(data, updated, previous) {
   const report = updated || {};
   const prev = previous || {};
-  const ownerName = [String(report?.user?.lastName || '').trim(), String(report?.user?.firstName || '').trim()].filter(Boolean).join(' ') || String(prev.owner || data.owner || '');
-  const ownerId = String(report?.user?.id || prev.ownerId || data.ownerId || '');
+  const ownerSource = report?.user?.parent || report?.user || null;
+  const ownerName = buildPersonDisplayName(ownerSource) || String(prev.owner || data.owner || '');
+  const ownerId = String(ownerSource?.id || prev.ownerId || data.ownerId || '');
   const cropItemId = String(report?.cropVariety?.cropItem?.id || data.cropItemId || prev.cropItemId || '');
   const cropItemName = String(report?.cropVariety?.cropItem?.name || data.cropItemName || prev.cropItemName || '');
   const cropVarietyName = String(report?.cropVariety?.name || data.cropVarietyName || prev.cropVarietyName || '');
@@ -2053,6 +2066,22 @@ function syncControls({ state, searchInput, ownerFilter, fieldFilter, taskFilter
 // --------------------
 // GraphQL -> 新UIの簡易カード
 // --------------------
+function buildPersonDisplayName(user) {
+  const lastName = String(user?.lastName || '').trim();
+  const firstName = String(user?.firstName || '').trim();
+  const fullName = [lastName, firstName].filter(Boolean).join(' ').trim();
+  return fullName || String(user?.email || '').trim();
+}
+
+function resolveOwnerFromReportUser(user) {
+  const parent = user?.parent || null;
+  const source = parent || user || null;
+  return {
+    id: String(source?.id || '').trim(),
+    name: buildPersonDisplayName(source),
+  };
+}
+
 function toReportCardHtml(r) {
   const workDate = r.workDate ?? r.reportDate ?? r.date ?? '';
   const date = escapeHtml(workDate);
@@ -2062,11 +2091,11 @@ function toReportCardHtml(r) {
   const fieldRawName = r.field?.fieldName ?? r.field?.name ?? '';
   const fieldName = escapeHtml(fieldRawName);
   const fieldId = escapeHtml(String(r.field?.id ?? ''));
-  const ownerId = escapeHtml(String(r.user?.id ?? ''));
-  const userNameRaw = r.user?.farmName || ((r.user?.firstName || r.user?.lastName)
-    ? `${r.user?.lastName ?? ''} ${r.user?.firstName ?? ''}`.trim()
-    : (r.user?.email ?? ''));
-  const ownerName = escapeHtml(userNameRaw);
+  const resolvedOwner = resolveOwnerFromReportUser(r.user);
+  const ownerIdRaw = resolvedOwner.id;
+  const ownerNameRaw = resolvedOwner.name;
+  const ownerId = escapeHtml(ownerIdRaw);
+  const ownerName = escapeHtml(ownerNameRaw);
   const memoRaw = r.workDetail ?? '';
   const memo = escapeHtml(memoRaw);
   const cropItemRaw = r.cropItem ?? r.cropVariety?.cropItem ?? null;
@@ -2085,7 +2114,7 @@ function toReportCardHtml(r) {
   const imageUrl = escapeHtml(imageUrlRaw);
   const updatedAtRaw = workDate ? formatDateJa(workDate) : '';
   const updatedAt = escapeHtml(updatedAtRaw || '—');
-  const text = escapeHtml([taskName, cropItemNameRaw, cropVarietyNameRaw, fieldRawName, userNameRaw, memoRaw, weatherNameRaw].filter(Boolean).join(' '));
+  const text = escapeHtml([taskName, cropItemNameRaw, cropVarietyNameRaw, fieldRawName, ownerNameRaw, memoRaw, weatherNameRaw].filter(Boolean).join(' '));
   // const title = escapeHtml(memoRaw ? memoRaw.split(/\r?\n/)[0].trim().slice(0, 60) : defaultTitleForTask(taskName));
   const title = defaultTitleForTask(taskName);
   const weatherBadge = escapeHtml(buildWeatherBadge(weatherCode, weatherNameRaw));
@@ -2096,7 +2125,7 @@ function toReportCardHtml(r) {
     <article class="report-card" data-report data-report-id="${escapeHtml(String(r.id ?? ''))}" data-date="${date}" data-task="${task}" data-task-id="${taskId}" data-owner="${ownerName}" data-owner-id="${ownerId}" data-field="${fieldName}" data-field-id="${fieldId}" data-memo="${memo}" data-crop-item-id="${cropItemId}" data-crop-item-name="${cropItemName}" data-crop-variety-id="${cropVarietyId}" data-crop-variety-name="${cropVarietyName}" data-weather-code="${weatherCode}" data-weather-name="${weatherName}" data-hours="${hours}" data-time="${hoursRaw ? `${hoursRaw}h` : ''}" data-image-url="${imageUrl}" data-updated-at="${updatedAt}" data-text="${text}">
       <div class="report-thumb${thumb.empty ? ' is-empty' : ''}">${thumb.html}</div>
       <div class="report-content">
-        <div class="report-meta">${escapeHtml(toJaMetaLine(workDate, fieldRawName, userNameRaw))}</div>
+        <div class="report-meta">${escapeHtml(toJaMetaLine(workDate, fieldRawName, ownerNameRaw))}</div>
         <div class="report-title">${title}</div>
         <div class="report-tags"><span class="report-tag">${task}</span>${cropItemNameRaw ? `<span class="report-tag">${cropItemName}</span>` : ''}${cropVarietyNameRaw ? `<span class="report-tag">${cropVarietyName}</span>` : ''}</div>
         <div class="report-footer">
