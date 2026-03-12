@@ -301,14 +301,38 @@
     }
 
     .pill-owner {
-      color: #374151;
-      background: rgba(255, 255, 255, 0.72);
-      border-color: rgba(226, 232, 240, 0.95);
+      color: #475569;
+      background: rgba(255, 255, 255, 0.78);
+      border-color: rgba(226, 232, 240, 0.98);
+      gap: 5px;
     }
 
     .pill-owner::before {
-      content: '🏠';
-      font-size: 0.68rem;
+      content: none;
+    }
+
+    .field-owner-icon {
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 14px;
+      color: #64748b;
+    }
+
+    .field-owner-icon svg {
+      width: 14px;
+      height: 14px;
+      display: block;
+      fill: currentColor;
+    }
+
+    .field-owner-text {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .pill-type-rice {

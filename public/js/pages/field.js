@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const detailTypeChip = document.getElementById('detail-type-chip');
   const detailStatusChip = document.getElementById('detail-status-chip');
   const inputOwner = document.getElementById('detail-owner');
+  const detailOwnerChip = document.getElementById('detail-owner-chip');
   const inputPostal = document.getElementById('detail-postal');
   const inputAddress = document.getElementById('detail-address');
 
@@ -448,6 +449,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     inputName.value = field.name || '';
     if (inputArea) inputArea.value = field.area != null && field.area !== '' ? String(field.area) : '';
     inputOwner.value = field.ownerName || '';
+    updateDetailOwnerPreview(field.ownerName || '');
     inputPostal.value = field.postalCode || '';
     inputAddress.value = field.address || '';
     if (inputLat) inputLat.value = field.latitude != null && field.latitude !== '' ? String(field.latitude) : '';
@@ -487,6 +489,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (modalEditBtn) modalEditBtn.textContent = isEditing ? '編集終了' : '編集';
     if (detailTypeChip?.parentElement) detailTypeChip.parentElement.style.display = isEditing ? 'none' : '';
     if (detailStatusChip?.parentElement) detailStatusChip.parentElement.style.display = isEditing ? 'none' : '';
+    if (detailOwnerChip?.parentElement) detailOwnerChip.parentElement.style.display = isEditing ? 'none' : '';
   }
 
   function updateDetailMapFromInputs() {
@@ -765,6 +768,41 @@ function getFieldStatePillClass(id, description) {
   return 'pill-status-neutral';
 }
 
+
+function orgIconSvg() {
+  return '<span class="field-owner-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 20h16v-2H4v2zm2-4h3V4H6v12zm5 0h2V8h-2v8zm4 0h3V6h-3v10z"/></svg></span>';
+}
+
+function updateDetailOwnerPreview(ownerName) {
+  const detailOwnerPreview = document.querySelector('#detail-owner-preview');
+  const detailOwnerChip = document.querySelector('#detail-owner-chip');
+
+  if (!detailOwnerPreview) return;
+
+  const name = String(ownerName || '').trim();
+
+  if (!name) {
+    detailOwnerPreview.hidden = true;
+    if (detailOwnerChip) detailOwnerChip.innerHTML = '';
+    return;
+  }
+
+  detailOwnerPreview.hidden = false;
+
+  if (detailOwnerChip) {
+    detailOwnerChip.innerHTML = `
+      <span class="user-org-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" focusable="false">
+          <path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M6 20V8l6-3 6 3v12" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M9 11h.01M12 11h.01M15 11h.01M9 14h.01M12 14h.01M15 14h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span>${escapeHtml(name)}</span>
+    `;
+  }
+}
+
 function toFieldCardHtml(field) {
   const typeClass = getFieldTypePillClass(field.fieldTypeID, field.fieldTypeName);
   const stateClass = getFieldStatePillClass(field.fieldStateID, field.fieldStateDescription);
@@ -781,7 +819,7 @@ function toFieldCardHtml(field) {
       <div class="field-pill-row">
         ${field.fieldTypeName ? `<span class="pill pill-type ${typeClass}">${esc(field.fieldTypeName)}</span>` : ''}
         ${field.fieldStateDescription ? `<span class="pill pill-status ${stateClass}">${esc(field.fieldStateDescription)}</span>` : ''}
-        ${field.ownerName ? `<span class="pill pill-owner">${esc(field.ownerName)}</span>` : ''}
+        ${field.ownerName ? `<span class="pill pill-owner">${orgIconSvg()}<span class="field-owner-text">${esc(field.ownerName)}</span></span>` : ''}
       </div>
       <div class="field-meta-row">
         <div class="field-meta-left">
