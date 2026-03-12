@@ -553,9 +553,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         syncCropVarietySelect(createForm, '', { id: '', name: '' });
         resetImagePreview({ imageSelector: '#new-image', wrapperSelector: '#new-image-wrapper', placeholderSelector: '#new-image-placeholder' });
         rerender({ resetPage: true });
+        window.appToast?.('日報を登録しました。', 'success');
       } catch (err) {
         console.error('[report] createWorkReport failed:', err);
         setMessage(createMsg, err.message || '日報の登録に失敗しました', 'error');
+        window.appToast?.(err.message || '日報の登録に失敗しました', 'error');
       } finally {
         if (createSaveBtn) createSaveBtn.disabled = false;
       }
@@ -594,9 +596,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         closeModal(editModal);
         rerender({ resetPage: false });
+        window.appToast?.('日報を更新しました。', 'success');
       } catch (err) {
         console.error('[report] updateWorkReport failed:', err);
         setMessage(editMsg, err.message || '日報の更新に失敗しました', 'error');
+        window.appToast?.(err.message || '日報の更新に失敗しました', 'error');
       } finally {
         if (editSaveBtn) editSaveBtn.disabled = false;
       }
@@ -632,9 +636,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeModal(editModal);
         closeModal(detailModal);
         rerender({ resetPage: false });
+        window.appToast?.('日報を削除しました。', 'success');
       } catch (err) {
         console.error('[report] deleteWorkReport failed:', err);
         setMessage(editMsg, err.message || '日報の削除に失敗しました', 'error');
+        window.appToast?.(err.message || '日報の削除に失敗しました', 'error');
       } finally {
         editDeleteBtn.disabled = false;
         if (editSaveBtn) editSaveBtn.disabled = false;
