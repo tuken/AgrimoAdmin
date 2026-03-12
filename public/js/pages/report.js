@@ -777,6 +777,39 @@ function setSelectValueOrText(selectEl, value, text) {
   return setSelectByText(selectEl, text);
 }
 
+function setHoursSelectValue(selectEl, value, options) {
+  if (!selectEl) return;
+  const opts = options || {};
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    selectEl.value = '';
+    return;
+  }
+
+  const normalized = String(Number(raw));
+  const list = Array.from(selectEl.options || []);
+  const matched = list.find(function (opt) {
+    return String(opt?.value || '').trim() === raw || String(opt?.value || '').trim() === normalized;
+  });
+
+  if (matched) {
+    selectEl.value = matched.value;
+    return;
+  }
+
+  if (opts.allowLegacyOption) {
+    const legacy = document.createElement('option');
+    legacy.value = raw;
+    legacy.textContent = `${raw}時間`;
+    legacy.dataset.legacyHour = '1';
+    selectEl.appendChild(legacy);
+    selectEl.value = raw;
+    return;
+  }
+
+  selectEl.value = '';
+}
+
 function normalizeFormData(fd, formEl) {
   const date = (fd.get('date') || '').toString().trim();
 
@@ -894,7 +927,7 @@ function fillDetailModal(data) {
     detailWeather.value = data.weatherCode || '';
     if (!detailWeather.value && data.weatherName) setSelectByText(detailWeather, data.weatherName);
   }
-  if (detailHours) detailHours.value = data.hours || '';
+  if (detailHours) setHoursSelectValue(detailHours, data.hours, { allowLegacyOption: true });
   if (detailUpdatedAt) detailUpdatedAt.value = data.updatedAt || '—';
   if (detailNote) detailNote.value = data.memo || '';
   setDetailImageState(data.imageUrl);
@@ -1022,7 +1055,7 @@ async function fillEditForm(data) {
   }
 
   const hoursInput = qs('#edit-time-hours', editForm);
-  if (hoursInput) hoursInput.value = data.hours || '';
+  if (hoursInput) setHoursSelectValue(hoursInput, data.hours, { allowLegacyOption: true });
 
   const noteInput = qs('#edit-note-text');
   if (noteInput) noteInput.value = data.memo || '';
@@ -1121,7 +1154,7 @@ function buildReportCardElement(data) {
   el.dataset.text = data.text || '';
 
   const meta = toJaMetaLine(data.date, data.field, data.owner);
-  const title = data.title || defaultTitleForTask(data.task, data.field);
+  const title = /*data.title || **/defaultTitleForTask(data.task);
   const tag = data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '';
   const hoursBadge = buildHoursBadge(data.hours);
   const weatherBadge = escapeHtml(buildWeatherBadge(data.weatherCode, data.weatherName));
@@ -1171,7 +1204,7 @@ function applyCardUpdate(card, data) {
   card.dataset.text = data.text || '';
 
   const meta = toJaMetaLine(data.date, data.field, data.owner);
-  const title = data.title || defaultTitleForTask(data.task, data.field);
+  const title = /*data.title || */defaultTitleForTask(data.task);
   const metaEl = qs('.report-meta', card);
   const titleEl = qs('.report-title', card);
   const tagsEl = qs('.report-tags', card);
@@ -1201,14 +1234,8 @@ function toJaMetaLine(dateKey, field, owner) {
 }
 
 function defaultTitleForTask(task, field) {
-  if (!task) return '作業日報';
-  const f = field ? `（${field}）` : '';
-  if (task === '灌水') return `灌水作業${f}`;
-  if (task === '施肥') return `施肥作業${f}`;
-  if (task === '収穫') return `収穫作業${f}`;
-  if (task === '除草') return `除草作業${f}`;
-  if (task.indexOf('防除') === 0) return `防除作業${f}`;
-  return `${task}作業${f}`;
+  // if (!task) return '作業日報';
+  return String(task || '').trim() || '作業日報';
 }
 
 function formatUpdatedNow() {
@@ -2059,7 +2086,8 @@ function toReportCardHtml(r) {
   const updatedAtRaw = workDate ? formatDateJa(workDate) : '';
   const updatedAt = escapeHtml(updatedAtRaw || '—');
   const text = escapeHtml([taskName, cropItemNameRaw, cropVarietyNameRaw, fieldRawName, userNameRaw, memoRaw, weatherNameRaw].filter(Boolean).join(' '));
-  const title = escapeHtml(memoRaw ? memoRaw.split(/\r?\n/)[0].trim().slice(0, 60) : defaultTitleForTask(taskName, fieldRawName));
+  // const title = escapeHtml(memoRaw ? memoRaw.split(/\r?\n/)[0].trim().slice(0, 60) : defaultTitleForTask(taskName));
+  const title = defaultTitleForTask(taskName);
   const weatherBadge = escapeHtml(buildWeatherBadge(weatherCode, weatherNameRaw));
   const hoursBadge = buildHoursBadge(hoursRaw);
   const thumb = buildReportThumbMarkup(imageUrlRaw, `${taskName || '作業'}の様子`);

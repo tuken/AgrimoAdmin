@@ -1258,6 +1258,9 @@ ${err.message || err}`);
         email,
         firstName,
         lastName,
+        fieldIDs: isOwner ? [] : detailSelectedFields
+          .map((f) => String(typeof f === 'string' ? '' : (f?.id || '')).trim())
+          .filter(Boolean),
       };
       if (isOwner) input.farmName = farmName;
       if (password) input.password = password;
@@ -1283,6 +1286,13 @@ ${err.message || err}`);
         const updatedGender = normalizeGender(updatedUser?.gender || gender);
         const updatedBirthday = normalizeDateOnly(updatedUser?.birthday || birthday);
         const updatedNote = String(updatedUser?.note || note || '').trim();
+        const updatedFields = Array.isArray(updatedUser?.fields) && updatedUser.fields.length
+          ? updatedUser.fields.map((f) => ({ id: String(f?.id || '').trim(), name: String(f?.name || '').trim() })).filter((f) => f.id || f.name)
+          : detailSelectedFields.map((f) => typeof f === 'string'
+            ? { id: '', name: String(f).trim() }
+            : { id: String(f?.id || '').trim(), name: String(f?.name || '').trim() }
+          ).filter((f) => f.id || f.name);
+        detailSelectedFields = updatedFields.slice();
 
         // update dataset
         activeCard.dataset.farmName = updatedFarmName;
@@ -1292,8 +1302,8 @@ ${err.message || err}`);
         activeCard.dataset.email = updatedEmail;
         activeCard.dataset.owner = isOwner ? 'はい' : 'いいえ';
         activeCard.dataset.ownerId = isOwner ? '' : ownerId;
-        activeCard.dataset.fields = detailSelectedFields.map((f) => typeof f === 'string' ? f : (f?.name || '')).filter(Boolean).join(',');
-        activeCard.dataset.fieldIds = detailSelectedFields.map((f) => typeof f === 'string' ? '' : (f?.id || '')).join(',');
+        activeCard.dataset.fields = updatedFields.map((f) => f.name || '').filter(Boolean).join(',');
+        activeCard.dataset.fieldIds = updatedFields.map((f) => f.id || '').join(',');
         activeCard.dataset.postalCode = updatedPostalCode;
         activeCard.dataset.address = updatedAddress;
         activeCard.dataset.gender = updatedGender;

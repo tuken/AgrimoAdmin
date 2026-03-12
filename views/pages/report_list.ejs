@@ -269,10 +269,14 @@
           </div>
 
           <div class="detail-form-group">
-            <label class="detail-label" for="detail-time-hours">作業時間（h）</label>
-            <div class="time-duration-wrapper">
-              <input id="detail-time-hours" class="detail-input time-hours-input" type="number" step="0.25" min="0" disabled>
-              <span class="time-duration-unit">h</span>
+            <label class="detail-label" for="detail-time-hours">作業時間</label>
+            <div class="time-duration-wrapper time-duration-wrapper--select">
+              <select id="detail-time-hours" class="detail-select time-hours-select" disabled>
+                <option value="">選択してください</option>
+                <% for (let minutes = 30; minutes <= 24 * 60; minutes += 30) { const hourValue = String(minutes / 60); const label = minutes % 60 === 0 ? `${minutes / 60}時間` : `${Math.floor(minutes / 60)}時間30分`; %>
+                  <option value="<%= hourValue %>"><%= label %></option>
+                <% } %>
+              </select>
             </div>
           </div>
 
@@ -398,11 +402,16 @@
             </div>
 
             <div class="detail-form-group">
-              <label class="detail-label" for="new-time-hours">作業時間（h）</label>
-              <div class="time-duration-wrapper">
-                <input id="new-time-hours" class="detail-input time-hours-input" type="number" step="0.25" min="0" name="hours">
-                <span class="time-duration-unit">h</span>
+              <label class="detail-label" for="new-time-hours">作業時間</label>
+              <div class="time-duration-wrapper time-duration-wrapper--select">
+                <select id="new-time-hours" class="detail-select time-hours-select" name="hours">
+                  <option value="">選択してください</option>
+                  <% for (let minutes = 30; minutes <= 24 * 60; minutes += 30) { const hourValue = String(minutes / 60); const label = minutes % 60 === 0 ? `${minutes / 60}時間` : `${Math.floor(minutes / 60)}時間30分`; %>
+                    <option value="<%= hourValue %>"><%= label %></option>
+                  <% } %>
+                </select>
               </div>
+              <div class="detail-helper">30分単位で選択できます</div>
             </div>
 
             <div class="detail-form-group">
@@ -518,11 +527,16 @@
             </div>
 
             <div class="detail-form-group">
-              <label class="detail-label" for="edit-time-hours">作業時間（h）</label>
-              <div class="time-duration-wrapper">
-                <input id="edit-time-hours" class="detail-input time-hours-input" type="number" step="0.25" min="0" name="hours">
-                <span class="time-duration-unit">h</span>
+              <label class="detail-label" for="edit-time-hours">作業時間</label>
+              <div class="time-duration-wrapper time-duration-wrapper--select">
+                <select id="edit-time-hours" class="detail-select time-hours-select" name="hours">
+                  <option value="">選択してください</option>
+                  <% for (let minutes = 30; minutes <= 24 * 60; minutes += 30) { const hourValue = String(minutes / 60); const label = minutes % 60 === 0 ? `${minutes / 60}時間` : `${Math.floor(minutes / 60)}時間30分`; %>
+                    <option value="<%= hourValue %>"><%= label %></option>
+                  <% } %>
+                </select>
               </div>
+              <div class="detail-helper">30分単位で選択できます</div>
             </div>
 
             <div class="detail-form-group">

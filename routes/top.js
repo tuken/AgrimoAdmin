@@ -113,6 +113,10 @@ async function fetchLatestWorkReports(req) {
         workDate
         workHours
         workDetail
+        workType {
+          id
+          name
+        }
         field {
           id
           name
@@ -140,8 +144,9 @@ async function fetchLatestWorkReports(req) {
     const today = new Date();
     const todayYmd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     return list.map((item) => {
-      const workDetail = String(item?.workDetail || '').trim();
-      const title = (workDetail.split(/\r?\n/)[0] || '日報').trim();
+      //const workDetail = String(item?.workDetail || '').trim();
+      const workTypeName = String(item?.workType?.name || '').trim();
+      const title = (/*workDetail.split(/\r?\n/)[0] || */workTypeName || '日報').trim();
       const firstName = String(item?.user?.firstName || '').trim();
       const lastName = String(item?.user?.lastName || '').trim();
       const workerName = [lastName, firstName].filter(Boolean).join(' ') || '—';

@@ -324,14 +324,19 @@
   gap: 6px;
 }
 
-.time-hours-input {
-  max-width: 90px;
-  text-align: right;
+.time-duration-wrapper--select {
+  width: 100%;
 }
 
-.time-duration-unit {
-  font-size: 0.9rem;
-  color: #555;
+.time-hours-select {
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.detail-helper {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--text-sub);
 }
 
     /* ---------- 日報一覧 ---------- */
