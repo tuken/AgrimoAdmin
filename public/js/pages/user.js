@@ -922,19 +922,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const ownerId = getSelectedOwnerIdForNewUser();
 
       if (!lastName || !firstName || !email || !password) {
-        alert('姓、名、メールアドレス、パスワードを入力してください。');
+        window.appToast?.('姓、名、メールアドレス、パスワードを入力してください。', 'error');
         return;
       }
       if (!isValidPassword(password)) {
-        alert('パスワードは8文字以上20文字以下の半角英数字で入力してください。記号は !.-=_#@<> が使用できます。');
+        window.appToast?.('パスワードは8文字以上20文字以下の半角英数字で入力してください。記号は !.-=_#@<> が使用できます。', 'error');
         return;
       }
       if (!postalCode || postalCode.length !== 7 || !address || !gender || !birthday) {
-        alert('郵便番号、住所、性別、生年月日を入力してください。');
+        window.appToast?.('郵便番号、住所、性別、生年月日を入力してください。', 'error');
         return;
       }
       if (!isOwner && !ownerId) {
-        alert('所属オーナーを選択してください。');
+        window.appToast?.('所属オーナーを選択してください。', 'error');
         return;
       }
 
@@ -961,11 +961,11 @@ document.addEventListener('DOMContentLoaded', () => {
         await preloadOwnerOptions();
         await initializeUserListFromGraphQL();
         closeNewUserModal();
-        alert('登録しました。');
+        window.appToast?.('登録しました。', 'success');
       } catch (err) {
         console.error('Failed to create user:', err);
-        alert(`登録に失敗しました。
-${err.message || err}`);
+        window.appToast?.(`登録に失敗しました。
+${err.message || err}`, 'error', { duration: 4200 });
       } finally {
         newUserSave.disabled = oldDisabled;
       }
@@ -1248,11 +1248,11 @@ ${err.message || err}`);
       const email = (detailUserEmail?.value || '').trim();
       const password = String(detailUserPassword?.value || '');
       if (!lastName || !firstName || !email) {
-        alert('姓、名、メールアドレスを入力してください。');
+        window.appToast?.('姓、名、メールアドレスを入力してください。', 'error');
         return;
       }
       if (password && !isValidPassword(password)) {
-        alert('パスワードは8文字以上20文字以下の半角英数字で入力してください。記号は !.-=_#@<> が使用できます。');
+        window.appToast?.('パスワードは8文字以上20文字以下の半角英数字で入力してください。記号は !.-=_#@<> が使用できます。', 'error');
         return;
       }
 
@@ -1378,11 +1378,11 @@ ${err.message || err}`);
         applyUserSearch();
         setDetailEditMode(false);
         if (detailUserPassword) detailUserPassword.value = '';
-        alert('保存しました。');
+        window.appToast?.('保存しました。', 'success');
       } catch (err) {
         console.error('Failed to update user:', err);
-        alert(`保存に失敗しました。
-${err.message || err}`);
+        window.appToast?.(`保存に失敗しました。
+${err.message || err}`, 'error', { duration: 4200 });
       } finally {
         btnSave.disabled = oldDisabled;
       }
@@ -1394,7 +1394,7 @@ ${err.message || err}`);
       if (!activeCard) return;
       const targetId = String(activeCard.dataset.userId || '').trim();
       if (!targetId) {
-        alert('削除対象のユーザーIDを取得できませんでした。');
+        window.appToast?.('削除対象のユーザーIDを取得できませんでした。', 'error');
         return;
       }
       if (!confirm('このユーザーを削除しますか？')) return;
@@ -1410,11 +1410,11 @@ ${err.message || err}`);
         updateUserCount(filteredCards.length);
         syncNewUserSelects();
         syncDetailSelects();
-        alert('削除しました。');
+        window.appToast?.('削除しました。', 'success');
       } catch (err) {
         console.error('Failed to delete user:', err);
-        alert(`削除に失敗しました。
-${err.message || err}`);
+        window.appToast?.(`削除に失敗しました。
+${err.message || err}`, 'error', { duration: 4200 });
       } finally {
         btnDelete.disabled = oldDisabled;
       }
