@@ -981,7 +981,7 @@
   }
 
   .calendar-grid {
-/*    min-width: 420px;  /* ← 全7列が絶対に収まる幅を指定 */*/
+/*    min-width: 420px;  /* ← 全7列が絶対に収まる幅を指定 */
     font-size: 0.65rem;
   }
 
@@ -1065,9 +1065,9 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: #aae368;
   font-size: 0.8rem;
-  color: #374151;
+  color: #000000;
 }
 
 .chip-remove {
@@ -1223,8 +1223,8 @@
   font-size: 0.7rem;
   border-radius: 999px;
   padding: 2px 8px;
-  background: rgba(15, 23, 42, 0.04);
-  color: #4b5563;
+  background: #aae368a6;
+  color: #000000;
 }
 
 /* 右側メタ情報 */

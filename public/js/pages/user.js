@@ -1012,6 +1012,16 @@ ${err.message || err}`);
   let originalSnapshot = null;
 
   function renderDetailFieldChips() {
+    const isEditing = !!(btnSave && btnSave.style.display !== 'none');
+    if (!detailFieldChips) return;
+
+    if (!isEditing) {
+      detailFieldChips.innerHTML = detailSelectedFields.map((f) => `
+        <span class="chip">${escapeHtml(typeof f === 'string' ? f : (f?.name || ''))}</span>
+      `).join('');
+      return;
+    }
+
     renderChips(detailFieldChips, detailSelectedFields, (i) => {
       detailSelectedFields.splice(i, 1);
       renderDetailFieldChips();
