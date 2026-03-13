@@ -127,6 +127,26 @@ async function findById(userId) {
   return rows[0] || null;
 }
 
+async function canUserSignIn(userRow) {
+  if (!userRow) return false;
+
+  const roleId = Number(userRow.role_id);
+  if (roleId !== 3 && roleId !== 4) return true;
+
+  const parentId = Number(userRow.parent_id || 0);
+  if (!parentId) return false;
+
+  const rows = await query(
+    'SELECT id, deleted_at FROM users WHERE id = ? LIMIT 1',
+    [parentId]
+  );
+  const parent = rows[0] || null;
+  if (!parent) return false;
+  if (parent.deleted_at != null) return false;
+
+  return true;
+}
+
 async function verifyPassword(userRow, plainPassword) {
   if (!userRow) return false;
   return bcrypt.compare(String(plainPassword || ''), String(userRow.password || ''));
@@ -184,6 +204,7 @@ module.exports = {
   findByEmail,
   findAuthContextByEmail,
   findAuthContextByUserId,
+  canUserSignIn,
   verifyPassword,
   updateLastLoginAt,
   hashPassword,

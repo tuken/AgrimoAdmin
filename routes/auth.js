@@ -1,5 +1,5 @@
 const express = require('express');
-const { findAuthContextByEmail, verifyPassword, toSafeUser, updateLastLoginAt } = require('../models/user');
+const { findAuthContextByEmail, canUserSignIn, verifyPassword, toSafeUser, updateLastLoginAt } = require('../models/user');
 const router = express.Router();
 
 /*
@@ -27,6 +27,11 @@ router.post('/signin', async (req, res) => {
         const ok = await verifyPassword(userRow, password);
         if (!ok) {
             return res.render('pages/signin', { title: 'サインイン', error: 'メールアドレスまたはパスワードが正しくありません' });
+        }
+
+        const allowed = await canUserSignIn(userRow);
+        if (!allowed) {
+            return res.render('pages/signin', { title: 'サインイン', error: '紐づくオーナーが存在しないためログインできません' });
         }
 
         // ログイン日時更新
