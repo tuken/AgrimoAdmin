@@ -822,8 +822,8 @@ function normalizeFormData(fd, formEl) {
   const taskId = (fd.get('task') || '').toString().trim();
   const taskName = getSelectedText(formEl?.querySelector('[name="task"]')) || taskId;
 
-  const ownerId = (fd.get('owner_id') || '').toString().trim();
-  const owner = (formEl?.querySelector('#new-owner')?.value || formEl?.querySelector('#edit-owner')?.value || '').toString().trim() || ownerId;
+  const userId = (fd.get('owner_id') || '').toString().trim();
+  const user = (formEl?.querySelector('#new-owner')?.value || formEl?.querySelector('#edit-owner')?.value || '').toString().trim() || userId;
 
   const fieldId = (fd.get('field_id') || fd.get('field') || '').toString().trim();
   const fieldName = getSelectedText(formEl?.querySelector('[name="field_id"]')) || (fd.get('field') || '').toString().trim();
@@ -851,14 +851,14 @@ function normalizeFormData(fd, formEl) {
   const imageUrl = previewImg && !previewImg.hidden ? (previewImg.getAttribute('src') || '') : '';
 
   const time = hours ? `${hours}h` : '';
-  const text = [taskName, cropItemName, cropVarietyName, title, fieldName, owner, memo, weatherName].filter(Boolean).join(' ');
+  const text = [taskName, cropItemName, cropVarietyName, title, fieldName, user, memo, weatherName].filter(Boolean).join(' ');
 
   return {
     date,
     task: taskName,
     taskId,
-    owner,
-    ownerId,
+    user,
+    userId,
     field: fieldName,
     fieldId,
     title,
@@ -882,6 +882,8 @@ function readCardData(card) {
   const task = ds.task || '';
   const owner = ds.owner || '';
   const ownerId = ds.ownerId || '';
+  const user = ds.user || '';
+  const userId = ds.userId || '';
   const field = ds.field || '';
   const fieldId = ds.fieldId || '';
   const title = ds.title || qs('.report-title', card)?.textContent?.trim() || '';
@@ -896,9 +898,9 @@ function readCardData(card) {
   const imageUrl = ds.imageUrl || '';
   const updatedAt = ds.updatedAt || '';
   const time = ds.time || (hours ? `${hours}h` : '');
-  const text = ds.text || [task, cropItemName, cropVarietyName, title, field, owner, memo, weatherName].filter(Boolean).join(' ');
+  const text = ds.text || [task, cropItemName, cropVarietyName, title, field, user || owner, memo, weatherName].filter(Boolean).join(' ');
   const id = ds.reportId || ds.id || '';
-  return { id, date, task, owner, ownerId, field, fieldId, title, memo, time, hours, text, cropItemId, cropItemName, cropVarietyId, cropVarietyName, weatherCode, weatherName, imageUrl, updatedAt };
+  return { id, date, task, owner, ownerId, user, userId, field, fieldId, title, memo, time, hours, text, cropItemId, cropItemName, cropVarietyId, cropVarietyName, weatherCode, weatherName, imageUrl, updatedAt };
 }
 
 function fillDetailModal(data) {
@@ -924,7 +926,7 @@ function fillDetailModal(data) {
     setSelectValueOrText(detailCropItem, data.cropItemId || '', data.cropItemName || '');
   }
   if (detailCropVariety) detailCropVariety.value = data.cropVarietyName || '';
-  if (detailOwner) detailOwner.value = data.owner || '';
+  if (detailOwner) detailOwner.value = data.user || data.owner || '';
   if (detailField) {
     detailField.value = data.fieldId || '';
     if (!detailField.value && data.field) setSelectByText(detailField, data.field);
@@ -938,7 +940,7 @@ function fillDetailModal(data) {
   if (detailNote) detailNote.value = data.memo || '';
   setDetailImageState(data.imageUrl);
   if (detailMetaFooter) {
-    const parts = [formatDateJa(data.date) || '', data.field || '', data.owner || ''].filter(Boolean);
+    const parts = [formatDateJa(data.date) || '', data.field || '', data.user || data.owner || ''].filter(Boolean);
     detailMetaFooter.textContent = parts.join(' ／ ');
   }
 }
@@ -1044,9 +1046,9 @@ async function fillEditForm(data) {
   }
 
   const ownerInput = qs('#edit-owner', editForm);
-  if (ownerInput) ownerInput.value = data.owner || '';
+  if (ownerInput) ownerInput.value = data.user || data.owner || '';
   const ownerIdHidden = qs('#edit-owner-id', editForm);
-  if (ownerIdHidden) ownerIdHidden.value = data.ownerId || ownerIdHidden.value || '';
+  if (ownerIdHidden) ownerIdHidden.value = data.userId || ownerIdHidden.value || '';
 
   const fieldSel = qs('#edit-field', editForm);
   if (fieldSel) {
@@ -1143,6 +1145,8 @@ function buildReportCardElement(data) {
   el.dataset.taskId = data.taskId || '';
   el.dataset.owner = data.owner;
   el.dataset.ownerId = data.ownerId || '';
+  el.dataset.user = data.user || '';
+  el.dataset.userId = data.userId || '';
   el.dataset.field = data.field;
   el.dataset.fieldId = data.fieldId || '';
   el.dataset.title = data.title || '';
@@ -1159,7 +1163,7 @@ function buildReportCardElement(data) {
   el.dataset.updatedAt = formatUpdatedNow();
   el.dataset.text = data.text || '';
 
-  const meta = toJaMetaLine(data.date, data.field, data.owner);
+  const meta = toJaMetaLine(data.date, data.field, data.user || data.owner);
   const title = /*data.title || **/defaultTitleForTask(data.task);
   const tag = data.task ? `<span class="report-tag">${escapeHtml(data.task)}</span>` : '';
   const hoursBadge = buildHoursBadge(data.hours);
@@ -1193,6 +1197,8 @@ function applyCardUpdate(card, data) {
   card.dataset.taskId = data.taskId || '';
   card.dataset.owner = data.owner;
   card.dataset.ownerId = data.ownerId || '';
+  card.dataset.user = data.user || '';
+  card.dataset.userId = data.userId || '';
   card.dataset.field = data.field;
   card.dataset.fieldId = data.fieldId || '';
   card.dataset.title = data.title || '';
@@ -1209,7 +1215,7 @@ function applyCardUpdate(card, data) {
   card.dataset.updatedAt = formatUpdatedNow();
   card.dataset.text = data.text || '';
 
-  const meta = toJaMetaLine(data.date, data.field, data.owner);
+  const meta = toJaMetaLine(data.date, data.field, data.user || data.owner);
   const title = /*data.title || */defaultTitleForTask(data.task);
   const metaEl = qs('.report-meta', card);
   const titleEl = qs('.report-title', card);
@@ -1753,6 +1759,12 @@ async function updateWorkReportViaGraphQL(formEl, data) {
           firstName
           lastName
           email
+          parent {
+            id
+            firstName
+            lastName
+            email
+          }
         }
       }
     }
@@ -1797,9 +1809,12 @@ async function deleteWorkReportViaGraphQL(id) {
 function mergeUpdatedReportIntoCardData(data, updated, previous) {
   const report = updated || {};
   const prev = previous || {};
-  const ownerSource = report?.user?.parent || report?.user || null;
-  const ownerName = buildPersonDisplayName(ownerSource) || String(prev.owner || data.owner || '');
-  const ownerId = String(ownerSource?.id || prev.ownerId || data.ownerId || '');
+  const ownerSource = report?.user?.parent || null;
+  const ownerName = buildPersonDisplayName(ownerSource) || String(prev.owner || '');
+  const ownerId = String(ownerSource?.id || prev.ownerId || '');
+  const userSource = report?.user || null;
+  const userName = buildPersonDisplayName(userSource) || String(data.user || prev.user || '');
+  const userId = String(userSource?.id || data.userId || prev.userId || '');
   const cropItemId = String(report?.cropVariety?.cropItem?.id || data.cropItemId || prev.cropItemId || '');
   const cropItemName = String(report?.cropVariety?.cropItem?.name || data.cropItemName || prev.cropItemName || '');
   const cropVarietyName = String(report?.cropVariety?.name || data.cropVarietyName || prev.cropVarietyName || '');
@@ -1823,6 +1838,8 @@ function mergeUpdatedReportIntoCardData(data, updated, previous) {
     field: fieldName,
     owner: ownerName,
     ownerId,
+    user: userName,
+    userId,
     cropItemId,
     cropItemName,
     cropVarietyId: String(report?.cropVariety?.id || data.cropVarietyId || prev.cropVarietyId || ''),
@@ -1880,6 +1897,18 @@ async function createWorkReportViaGraphQL(formEl, data) {
         workType { id name }
         cropVariety { id name }
         weather { code japanese }
+        user {
+          id
+          firstName
+          lastName
+          email
+          parent {
+            id
+            firstName
+            lastName
+            email
+          }
+        }
       }
     }
   `;
@@ -1904,6 +1933,8 @@ async function createWorkReportViaGraphQL(formEl, data) {
 
 function mergeCreatedReportIntoCardData(data, created) {
   const report = created || {};
+  const ownerSource = report?.user?.parent || null;
+  const userSource = report?.user || null;
   return {
     ...data,
     id: String(report?.id || ''),
@@ -1916,6 +1947,10 @@ function mergeCreatedReportIntoCardData(data, created) {
     task: String(report?.workType?.name || data.task || ''),
     fieldId: String(report?.field?.id || data.fieldId || ''),
     field: String(report?.field?.name || data.field || ''),
+    owner: buildPersonDisplayName(ownerSource) || String(data.owner || ''),
+    ownerId: String(ownerSource?.id || data.ownerId || ''),
+    user: buildPersonDisplayName(userSource) || String(data.user || ''),
+    userId: String(userSource?.id || data.userId || ''),
     cropVarietyId: String(report?.cropVariety?.id || data.cropVarietyId || ''),
     cropVarietyName: String(report?.cropVariety?.name || data.cropVarietyName || ''),
     weatherCode: report?.weather?.code != null ? String(report.weather.code) : String(data.weatherCode || ''),
@@ -1926,7 +1961,7 @@ function mergeCreatedReportIntoCardData(data, created) {
       String(data.cropItemName || ''),
       String(report?.cropVariety?.name || data.cropVarietyName || ''),
       String(report?.field?.name || data.field || ''),
-      String(data.owner || ''),
+      String(data.user || ''),
       String(report?.workDetail || data.memo || ''),
       String(report?.weather?.japanese || data.weatherName || ''),
     ].filter(Boolean).join(' '),
@@ -2088,6 +2123,14 @@ function resolveOwnerFromReportUser(user) {
   };
 }
 
+function resolveUserFromReportUser(user) {
+  const source = user || null;
+  return {
+    id: String(source?.id || '').trim(),
+    name: buildPersonDisplayName(source),
+  };
+}
+
 function toReportCardHtml(r) {
   const workDate = r.workDate ?? r.reportDate ?? r.date ?? '';
   const date = escapeHtml(workDate);
@@ -2098,10 +2141,15 @@ function toReportCardHtml(r) {
   const fieldName = escapeHtml(fieldRawName);
   const fieldId = escapeHtml(String(r.field?.id ?? ''));
   const resolvedOwner = resolveOwnerFromReportUser(r.user);
+  const resolvedUser = resolveUserFromReportUser(r.user);
   const ownerIdRaw = resolvedOwner.id;
   const ownerNameRaw = resolvedOwner.name;
   const ownerId = escapeHtml(ownerIdRaw);
   const ownerName = escapeHtml(ownerNameRaw);
+  const userIdRaw = resolvedUser.id;
+  const userNameRaw = resolvedUser.name;
+  const userId = escapeHtml(userIdRaw);
+  const userName = escapeHtml(userNameRaw);
   const memoRaw = r.workDetail ?? '';
   const memo = escapeHtml(memoRaw);
   const cropItemRaw = r.cropItem ?? r.cropVariety?.cropItem ?? null;
@@ -2120,7 +2168,7 @@ function toReportCardHtml(r) {
   const imageUrl = escapeHtml(imageUrlRaw);
   const updatedAtRaw = workDate ? formatDateJa(workDate) : '';
   const updatedAt = escapeHtml(updatedAtRaw || '—');
-  const text = escapeHtml([taskName, cropItemNameRaw, cropVarietyNameRaw, fieldRawName, ownerNameRaw, memoRaw, weatherNameRaw].filter(Boolean).join(' '));
+  const text = escapeHtml([taskName, cropItemNameRaw, cropVarietyNameRaw, fieldRawName, userNameRaw, memoRaw, weatherNameRaw].filter(Boolean).join(' '));
   // const title = escapeHtml(memoRaw ? memoRaw.split(/\r?\n/)[0].trim().slice(0, 60) : defaultTitleForTask(taskName));
   const title = defaultTitleForTask(taskName);
   const weatherBadge = escapeHtml(buildWeatherBadge(weatherCode, weatherNameRaw));
@@ -2128,10 +2176,10 @@ function toReportCardHtml(r) {
   const thumb = buildReportThumbMarkup(imageUrlRaw, `${taskName || '作業'}の様子`);
 
   return `
-    <article class="report-card" data-report data-report-id="${escapeHtml(String(r.id ?? ''))}" data-date="${date}" data-task="${task}" data-task-id="${taskId}" data-owner="${ownerName}" data-owner-id="${ownerId}" data-field="${fieldName}" data-field-id="${fieldId}" data-memo="${memo}" data-crop-item-id="${cropItemId}" data-crop-item-name="${cropItemName}" data-crop-variety-id="${cropVarietyId}" data-crop-variety-name="${cropVarietyName}" data-weather-code="${weatherCode}" data-weather-name="${weatherName}" data-hours="${hours}" data-time="${hoursRaw ? `${hoursRaw}h` : ''}" data-image-url="${imageUrl}" data-updated-at="${updatedAt}" data-text="${text}">
+    <article class="report-card" data-report data-report-id="${escapeHtml(String(r.id ?? ''))}" data-date="${date}" data-task="${task}" data-task-id="${taskId}" data-owner="${ownerName}" data-owner-id="${ownerId}" data-user="${userName}" data-user-id="${userId}" data-field="${fieldName}" data-field-id="${fieldId}" data-memo="${memo}" data-crop-item-id="${cropItemId}" data-crop-item-name="${cropItemName}" data-crop-variety-id="${cropVarietyId}" data-crop-variety-name="${cropVarietyName}" data-weather-code="${weatherCode}" data-weather-name="${weatherName}" data-hours="${hours}" data-time="${hoursRaw ? `${hoursRaw}h` : ''}" data-image-url="${imageUrl}" data-updated-at="${updatedAt}" data-text="${text}">
       <div class="report-thumb${thumb.empty ? ' is-empty' : ''}">${thumb.html}</div>
       <div class="report-content">
-        <div class="report-meta">${escapeHtml(toJaMetaLine(workDate, fieldRawName, ownerNameRaw))}</div>
+        <div class="report-meta">${escapeHtml(toJaMetaLine(workDate, fieldRawName, userNameRaw || ownerNameRaw))}</div>
         <div class="report-title">${title}</div>
         <div class="report-tags"><span class="report-tag">${task}</span>${cropItemNameRaw ? `<span class="report-tag">${cropItemName}</span>` : ''}${cropVarietyNameRaw ? `<span class="report-tag">${cropVarietyName}</span>` : ''}</div>
         <div class="report-footer">
