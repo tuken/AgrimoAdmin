@@ -1393,11 +1393,24 @@ ${err.message || err}`, 'error', { duration: 4200 });
     btnDelete.addEventListener('click', async () => {
       if (!activeCard) return;
       const targetId = String(activeCard.dataset.userId || '').trim();
+      const roleId = Number(activeCard.dataset.ownerId || 0);
+
       if (!targetId) {
         window.appToast?.('削除対象のユーザーIDを取得できませんでした。', 'error');
         return;
       }
-      if (!confirm('このユーザーを削除しますか？')) return;
+
+
+      const confirmMessage = roleId === 0
+        ? `このオーナーを削除しますか？
+
+※削除すると、紐づく以下のデータもすべて削除されます。
+・圃場
+・作業者
+・日報`
+: 'このユーザーを削除しますか？';
+
+      if (!confirm(confirmMessage)) return;
 
       const oldDisabled = btnDelete.disabled;
       btnDelete.disabled = true;
